@@ -1,0 +1,224 @@
+/* ═══════════════════════════════════════════════════════════════════
+   Button Component — Phase 2
+   Variants: primary, secondary, ghost, destructive
+   Features: loading state, ripple effect, disabled state
+   ═══════════════════════════════════════════════════════════════════ */
+
+.button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--font-sans);
+  font-weight: var(--font-semibold);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  overflow: hidden;
+  transition: 
+    background-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-bounce),
+    box-shadow var(--duration-fast) var(--ease-standard);
+  user-select: none;
+  white-space: nowrap;
+}
+
+.button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* ─── SIZES ───────────────────────────────────────────────────────── */
+.button--sm {
+  height: 32px;
+  padding: 0 12px;
+  font-size: var(--text-sm);
+}
+
+.button--md {
+  height: 40px;
+  padding: 0 16px;
+  font-size: var(--text-base);
+}
+
+.button--lg {
+  height: 48px;
+  padding: 0 24px;
+  font-size: var(--text-lg);
+}
+
+/* ─── VARIANTS ────────────────────────────────────────────────────── */
+
+/* Primary */
+.button--primary {
+  background: linear-gradient(135deg, var(--gradient-primary), var(--gradient-secondary));
+  color: white;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.button--primary:hover:not(:disabled) {
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4), var(--shadow-glow);
+}
+
+.button--primary:focus-visible {
+  box-shadow: var(--focus-ring), 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+/* Secondary */
+.button--secondary {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.button--secondary:hover:not(:disabled) {
+  background: var(--bg-card-hover);
+  border-color: var(--border-active);
+}
+
+.button--secondary:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+
+/* Ghost */
+.button--ghost {
+  background: transparent;
+  color: var(--text-primary);
+  border: 1px solid transparent;
+}
+
+.button--ghost:hover:not(:disabled) {
+  background: var(--sidebar-hover);
+}
+
+.button--ghost:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+
+/* Destructive */
+.button--destructive {
+  background: var(--danger);
+  color: white;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+}
+
+.button--destructive:hover:not(:disabled) {
+  background: #dc2626;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4), var(--shadow-glow-danger);
+}
+
+.button--destructive:focus-visible {
+  box-shadow: var(--focus-ring-danger), 0 2px 8px rgba(239, 68, 68, 0.3);
+}
+
+/* ─── DISABLED STATE ──────────────────────────────────────────────── */
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ─── ICONS ───────────────────────────────────────────────────────── */
+.button__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.button__icon--left {
+  margin-right: 4px;
+}
+
+.button__icon--right {
+  margin-left: 4px;
+}
+
+/* ─── LOADING SPINNER ─────────────────────────────────────────────── */
+.button__spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  animation: spin 1s linear infinite;
+}
+
+.button__spinner svg {
+  width: 100%;
+  height: 100%;
+}
+
+.button__spinner-circle {
+  animation: button-spinner-dash 1.5s ease-in-out infinite;
+  transform-origin: center;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes button-spinner-dash {
+  0% {
+    stroke-dasharray: 1, 200;
+    stroke-dashoffset: 0;
+  }
+  50% {
+    stroke-dasharray: 89, 200;
+    stroke-dashoffset: -35px;
+  }
+  100% {
+    stroke-dasharray: 89, 200;
+    stroke-dashoffset: -124px;
+  }
+}
+
+/* ─── RIPPLE EFFECT ───────────────────────────────────────────────── */
+.button__ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(0);
+  animation: ripple-animation 0.6s ease-out;
+  pointer-events: none;
+}
+
+@keyframes ripple-animation {
+  to {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+/* ─── FULL WIDTH ──────────────────────────────────────────────────── */
+.button--full-width {
+  width: 100%;
+}
+
+/* ─── ACCESSIBILITY ───────────────────────────────────────────────── */
+.button:focus-visible {
+  outline: none;
+}
+
+/* ─── REDUCED MOTION ──────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .button {
+    transition: none;
+  }
+  
+  .button:active:not(:disabled) {
+    transform: none;
+  }
+  
+  .button__ripple {
+    animation: none;
+  }
+  
+  .button__spinner {
+    animation-duration: 3s;
+  }
+}

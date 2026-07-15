@@ -1,0 +1,148 @@
+/* ═══════════════════════════════════════════════════════════════════
+   Tooltip Component — Phase 6
+   Positions: top, bottom, left, right
+   Features: delay, fade animation, glass surface
+   ═══════════════════════════════════════════════════════════════════ */
+
+.tooltip-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.tooltip {
+  position: absolute;
+  z-index: var(--z-tooltip);
+  padding: 8px 12px;
+  background: var(--surface-glass-bg);
+  backdrop-filter: blur(var(--surface-glass-blur));
+  -webkit-backdrop-filter: blur(var(--surface-glass-blur));
+  border: 1px solid var(--surface-glass-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  font-weight: var(--font-medium);
+  line-height: var(--leading-snug);
+  max-width: 280px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: 
+    opacity var(--duration-base) var(--ease-out),
+    transform var(--duration-base) var(--ease-out);
+}
+
+.tooltip--visible {
+  opacity: 1;
+}
+
+.tooltip__content {
+  position: relative;
+  z-index: 1;
+}
+
+/* ─── POSITIONS ───────────────────────────────────────────────────── */
+
+/* Top */
+.tooltip--top {
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(8px);
+  margin-bottom: 8px;
+}
+
+.tooltip--top.tooltip--visible {
+  transform: translateX(-50%) translateY(0);
+}
+
+.tooltip--top .tooltip__arrow {
+  top: 100%;
+  left: 50%;
+  margin-left: -4px;
+  border-width: 4px 4px 0;
+  border-top-color: var(--surface-glass-border);
+}
+
+/* Bottom */
+.tooltip--bottom {
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  margin-top: 8px;
+}
+
+.tooltip--bottom.tooltip--visible {
+  transform: translateX(-50%) translateY(0);
+}
+
+.tooltip--bottom .tooltip__arrow {
+  bottom: 100%;
+  left: 50%;
+  margin-left: -4px;
+  border-width: 0 4px 4px;
+  border-bottom-color: var(--surface-glass-border);
+}
+
+/* Left */
+.tooltip--left {
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%) translateX(8px);
+  margin-right: 8px;
+}
+
+.tooltip--left.tooltip--visible {
+  transform: translateY(-50%) translateX(0);
+}
+
+.tooltip--left .tooltip__arrow {
+  top: 50%;
+  right: -4px;
+  margin-top: -4px;
+  border-width: 4px 0 4px 4px;
+  border-left-color: var(--surface-glass-border);
+}
+
+/* Right */
+.tooltip--right {
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%) translateX(-8px);
+  margin-left: 8px;
+}
+
+.tooltip--right.tooltip--visible {
+  transform: translateY(-50%) translateX(0);
+}
+
+.tooltip--right .tooltip__arrow {
+  top: 50%;
+  left: -4px;
+  margin-top: -4px;
+  border-width: 4px 4px 4px 0;
+  border-right-color: var(--surface-glass-border);
+}
+
+/* ─── ARROW ───────────────────────────────────────────────────────── */
+.tooltip__arrow {
+  position: absolute;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-color: transparent;
+}
+
+/* ─── RESPONSIVE ──────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .tooltip {
+    max-width: 200px;
+    white-space: normal;
+  }
+}
+
+/* ─── REDUCED MOTION ──────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .tooltip {
+    transition: none;
+  }
+}

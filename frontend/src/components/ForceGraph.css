@@ -1,0 +1,201 @@
+/* ═══════════════════════════════════════════════════════════════════
+   ForceGraphEnhanced Component — Phase 7
+   Features: radial gradient nodes, sized by metric, hover highlight,
+             click-to-pin, zoom controls, legend, loading/empty states
+   ═══════════════════════════════════════════════════════════════════ */
+
+.force-graph-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 400px;
+  background: radial-gradient(circle at 50% 50%, rgba(30, 40, 60, 0.3), var(--bg-card));
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.force-graph-canvas-wrapper {
+  width: 100%;
+  height: 100%;
+}
+
+/* ─── LOADING STATE ───────────────────────────────────────────────── */
+.force-graph-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+/* ─── TOOLTIP ─────────────────────────────────────────────────────── */
+.force-graph-tooltip {
+  position: absolute;
+  padding: 10px 14px;
+  background: var(--surface-glass-bg);
+  backdrop-filter: blur(var(--surface-glass-blur));
+  -webkit-backdrop-filter: blur(var(--surface-glass-blur));
+  border: 1px solid var(--surface-glass-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xl);
+  z-index: var(--z-tooltip);
+  pointer-events: none;
+  min-width: 160px;
+  animation: fade-in var(--duration-fast) var(--ease-out);
+}
+
+.force-graph-tooltip__title {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--text-heading);
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.force-graph-tooltip__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: var(--text-xs);
+  margin-bottom: 4px;
+}
+
+.force-graph-tooltip__row:last-child {
+  margin-bottom: 0;
+}
+
+.force-graph-tooltip__label {
+  color: var(--text-muted);
+}
+
+.force-graph-tooltip__value {
+  color: var(--text-primary);
+  font-weight: var(--font-medium);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── CONTROLS ────────────────────────────────────────────────────── */
+.force-graph-controls {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: var(--z-sticky);
+}
+
+.force-graph-controls .button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ─── LEGEND ──────────────────────────────────────────────────────── */
+.force-graph-legend {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  padding: 12px 14px;
+  background: var(--surface-glass-bg);
+  backdrop-filter: blur(var(--surface-glass-blur));
+  -webkit-backdrop-filter: blur(var(--surface-glass-blur));
+  border: 1px solid var(--surface-glass-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  z-index: var(--z-sticky);
+  max-width: 180px;
+  animation: slide-up var(--duration-base) var(--ease-out);
+}
+
+.force-graph-legend__title {
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  color: var(--text-heading);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+
+.force-graph-legend__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.force-graph-legend__item:last-child {
+  margin-bottom: 0;
+}
+
+.force-graph-legend__color {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid;
+  flex-shrink: 0;
+}
+
+.force-graph-legend__label {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  text-transform: capitalize;
+  flex: 1;
+}
+
+.force-graph-legend__divider {
+  height: 1px;
+  background: var(--border-color);
+  margin: 8px 0;
+}
+
+.force-graph-legend__size-label {
+  font-size: 9px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ─── ANIMATIONS ──────────────────────────────────────────────────── */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ─── RESPONSIVE ──────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .force-graph-controls {
+    top: auto;
+    bottom: 12px;
+    right: 12px;
+    flex-direction: row;
+  }
+  
+  .force-graph-legend {
+    bottom: auto;
+    top: 12px;
+    left: 12px;
+    right: 60px;
+    max-width: none;
+  }
+}
+
+/* ─── REDUCED MOTION ──────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .force-graph-tooltip,
+  .force-graph-legend {
+    animation: none;
+  }
+}

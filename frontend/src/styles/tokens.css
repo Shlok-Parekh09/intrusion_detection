@@ -1,0 +1,177 @@
+/* ═══════════════════════════════════════════════════════════════════
+   XAGE XPAM — Design Tokens (Phase 1)
+   Extended from existing index.css variables
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ─── FONTS ───────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+@import '@fontsource/jetbrains-mono/600.css';
+@import '@fontsource/jetbrains-mono/700.css';
+
+:root {
+  /* ═══ EXISTING XAGE PALETTE (preserved, enhanced) ═══ */
+  
+  /* Sidebar */
+  --sidebar-bg: #1a1f2e;
+  --sidebar-active: #2563eb;
+  --sidebar-hover: rgba(255, 255, 255, 0.06);
+  --sidebar-text: #8892a4;
+  --sidebar-text-active: #ffffff;
+  --sidebar-width: 240px;
+  --sidebar-collapsed: 64px;
+
+  /* Main area */
+  --bg-main: #0f1219;
+  --bg-card: #161b26;
+  --bg-card-hover: #1c2233;
+  --bg-header: #131720;
+  --bg-elevated: #1e2330;
+
+  /* Borders */
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-active: rgba(37, 99, 235, 0.5);
+
+  /* Text */
+  --text-primary: #e8eaed;
+  --text-secondary: #8892a4;
+  --text-muted: #5a6478;
+  --text-heading: #ffffff;
+
+  /* Status colors (enhanced for WCAG AA) */
+  --success: #22c55e;
+  --success-bg: rgba(34, 197, 94, 0.12);
+  --success-border: rgba(34, 197, 94, 0.4);
+  --warning: #f59e0b;
+  --warning-bg: rgba(245, 158, 11, 0.12);
+  --warning-border: rgba(245, 158, 11, 0.4);
+  --danger: #ef4444;
+  --danger-bg: rgba(239, 68, 68, 0.12);
+  --danger-border: rgba(239, 68, 68, 0.4);
+  --info: #3b82f6;
+  --info-bg: rgba(59, 130, 246, 0.12);
+  --info-border: rgba(59, 130, 246, 0.4);
+
+  /* Charts */
+  --chart-bar-success: #22c55e;
+  --chart-bar-fail: #ef4444;
+  --chart-grid: rgba(255, 255, 255, 0.05);
+
+  /* ═══ NEW: GRADIENT ACCENTS ═══ */
+  --gradient-primary: #3b82f6;
+  --gradient-secondary: #8b5cf6;
+  --gradient-accent: #06b6d4;
+  --gradient-border: linear-gradient(135deg, rgba(59, 130, 246, 0.5), rgba(139, 92, 246, 0.3));
+  --gradient-glow: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(139, 92, 246, 0.08));
+
+  /* ═══ NEW: GLASS SURFACES (elevated only) ═══ */
+  --surface-glass-bg: rgba(22, 27, 38, 0.92);
+  --surface-glass-border: rgba(255, 255, 255, 0.08);
+  --surface-glass-blur: 12px;
+  --surface-glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+
+  /* ═══ NEW: TYPOGRAPHY SCALE ═══ */
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 14px;      /* New base (was 12px) */
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+  --text-3xl: 32px;
+
+  /* Line heights */
+  --leading-none: 1;
+  --leading-tight: 1.25;
+  --leading-snug: 1.375;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+
+  /* Font weights */
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+  --font-extrabold: 800;
+
+  /* Font families */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+
+  /* ═══ NEW: MOTION TOKENS ═══ */
+  --duration-fast: 150ms;
+  --duration-base: 250ms;
+  --duration-slow: 400ms;
+  --duration-slower: 600ms;
+  
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Transitions */
+  --transition-fast: var(--duration-fast) var(--ease-standard);
+  --transition-base: var(--duration-base) var(--ease-standard);
+  --transition-slow: var(--duration-slow) var(--ease-standard);
+
+  /* ═══ ENHANCED: RADII ═══ */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
+
+  /* ═══ ENHANCED: SHADOWS ═══ */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+  --shadow-glow: 0 0 20px rgba(59, 130, 246, 0.3);
+  --shadow-glow-danger: 0 0 20px rgba(239, 68, 68, 0.3);
+  --shadow-glow-success: 0 0 20px rgba(34, 197, 94, 0.3);
+
+  /* ═══ NEW: FOCUS STATES (WCAG AA) ═══ */
+  --focus-ring: 0 0 0 2px rgba(59, 130, 246, 0.5);
+  --focus-ring-danger: 0 0 0 2px rgba(239, 68, 68, 0.5);
+  --focus-ring-success: 0 0 0 2px rgba(34, 197, 94, 0.5);
+  --focus-ring-warning: 0 0 0 2px rgba(245, 158, 11, 0.5);
+
+  /* ═══ NEW: SPACING (for consistency) ═══ */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* ═══ NEW: Z-INDEX SCALE ═══ */
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-modal-backdrop: 300;
+  --z-modal: 400;
+  --z-toast: 500;
+  --z-tooltip: 600;
+}
+
+/* ─── REDUCED MOTION PREFERENCE ─────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 1ms;
+    --duration-base: 1ms;
+    --duration-slow: 1ms;
+    --duration-slower: 1ms;
+  }
+  
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

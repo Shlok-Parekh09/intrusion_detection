@@ -1,0 +1,315 @@
+import { useRef, useState, useCallback, useMemo } from 'react';
+import ForceGraph2D from 'react-force-graph-2d';
+import { ZoomIn, ZoomOut, RefreshCcw } from 'lucide-react';
+import { Button } from './Button';
+import { Badge } from './Badge';
+import { Skeleton } from './Skeleton';
+import { EmptyState } from './EmptyState';
+import { Tooltip } from './Tooltip';
+import './ForceGraph.css';
+
+interface GraphNode {
+  id: string;
+  label?: string;
+  type?: 'user' | 'device' | 'policy' | 'session' | 'threat';
+  risk_score?: number;
+  connections?: number;
+  is_red?: boolean;
+  x?: number;
+  y?: number;
+  fx?: number;
+  fy?: number;
+}
+
+interface GraphLink {
+  source: string | GraphNode;
+  target: string | GraphNode;
+  strength?: number;
+  timestamp?: number;
+}
+
+interface GraphData {
+  nodes: GraphNode[];
+  links: GraphLink[];
+}
+
+interface ForceGraphEnhancedProps {
+  data: GraphData;
+  height?: number;
+  onNodeClick?: (node: GraphNode) => void;
+}
+
+const NODE_COLORS = {
+  user: { fill: '#3b82f6', stroke: '#60a5fa', gradient: ['rgba(59, 130, 246, 0.8)', 'rgba(59, 130, 246, 0.1)'] },
+  device: { fill: '#22c55e', stroke: '#4ade80', gradient: ['rgba(34, 197, 94, 0.8)', 'rgba(34, 197, 94, 0.1)'] },
+  policy: { fill: '#8b5cf6', stroke: '#a78bfa', gradient: ['rgba(139, 92, 246, 0.8)', 'rgba(139, 92, 246, 0.1)'] },
+  session: { fill: '#06b6d4', stroke: '#22d3ee', gradient: ['rgba(6, 182, 212, 0.8)', 'rgba(6, 182, 212, 0.1)'] },
+  threat: { fill: '#ef4444', stroke: '#f87171', gradient: ['rgba(239, 68, 68, 0.9)', 'rgba(239, 68, 68, 0.15)'] },
+};
+
+const NODE_SIZE_MULTIPLIER = 2.5;
+const BASE_NODE_SIZE = 3;
+
+export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGraphEnhancedProps) {
+  const fgRef = useRef<any>(null);
+  const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
+  const [pinnedNode, setPinnedNode] = useState<GraphNode | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Calculate node size based on risk score or connections
+  const getNodeSize = useCallback((node: GraphNode) => {
+    const metric = node.risk_score || node.connections || 1;
+    return BASE_NODE_SIZE + Math.min((metric || 0) * NODE_SIZE_MULTIPLIER, 8);
+  }, []);
+
+  // Get node color by type
+  const getNodeColor = useCallback((node: GraphNode) => {
+    const type = node.type || (node.is_red ? 'threat' : 'device');
+    return NODE_COLORS[type as keyof typeof NODE_COLORS] || NODE_COLORS.device;
+  }, []);
+
+  // Highlight connected nodes on hover
+  const getLinkColor = useCallback((link: any) => {
+    if (hoveredNode) {
+      const isHighlighted = link.source.id === hoveredNode.id || link.target.id === hoveredNode.id;
+      return isHighlighted ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.02)';
+    }
+    return 'rgba(255, 255, 255, 0.04)';
+  }, [hoveredNode]);
+
+  const getLinkWidth = useCallback((link: any) => {
+    if (hoveredNode) {
+      const isHighlighted = link.source.id === hoveredNode.id || link.target.id === hoveredNode.id;
+      return isHighlighted ? 1.5 : 0.3;
+    }
+    return 0.4;
+  }, [hoveredNode]);
+
+  // Node render with radial gradient effect
+  const nodeCanvasObject = useCallback((node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
+    const color = getNodeColor(node);
+    const size = getNodeSize(node);
+    const r = size / globalScale;
+
+    // Radial gradient for glowing effect
+    const gradient = ctx.createRadialGradient(node.x, node.y, 0, node.x, node.y, r);
+    gradient.addColorStop(0, color.gradient[0]);
+    gradient.addColorStop(0.6, color.gradient[1]);
+    gradient.addColorStop(1, 'transparent');
+
+    // Draw glow
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, r * 1.5, 0, 2 * Math.PI, false);
+    ctx.fillStyle = gradient;
+    ctx.fill();
+
+    // Draw node core
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, r * 0.7, 0, 2 * Math.PI, false);
+    ctx.fillStyle = color.fill;
+    ctx.fill();
+
+    // Draw border ring
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, r * 0.7, 0, 2 * Math.PI, false);
+    ctx.strokeStyle = color.stroke;
+    ctx.lineWidth = 1.5 / globalScale;
+    ctx.stroke();
+
+    // Draw label on zoom
+    if (globalScale > 1.2) {
+      ctx.font = `${Math.max(10, 12 / globalScale)}px Inter`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+      ctx.fillText(node.label || node.id, node.x, node.y + r + 4 / globalScale);
+    }
+
+    // Highlight pinned node
+    if (pinnedNode && pinnedNode.id === node.id) {
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, r * 1.8, 0, 2 * Math.PI, false);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+      ctx.lineWidth = 2 / globalScale;
+      ctx.stroke();
+    }
+  }, [getNodeColor, getNodeSize, pinnedNode]);
+
+  // Highlight logic
+  const handleNodeHover = useCallback((node: GraphNode | null) => {
+    setHoveredNode(node);
+    document.body.style.cursor = node ? 'pointer' : 'default';
+  }, []);
+
+  const handleNodeClick = useCallback((node: GraphNode) => {
+    if (pinnedNode?.id === node.id) {
+      // Unpin
+      setPinnedNode(null);
+      node.fx = undefined;
+      node.fy = undefined;
+    } else {
+      // Pin
+      setPinnedNode(node);
+      node.fx = node.x;
+      node.fy = node.y;
+      fgRef.current?.centerAt(node.x, node.y, 1000);
+    }
+    onNodeClick?.(node);
+  }, [pinnedNode, onNodeClick]);
+
+  const handleBackgroundClick = useCallback(() => {
+    if (pinnedNode) {
+      (pinnedNode as any).fx = undefined;
+      (pinnedNode as any).fy = undefined;
+      setPinnedNode(null);
+    }
+  }, [pinnedNode]);
+
+  // Zoom controls
+  const handleZoomIn = useCallback(() => {
+    const newZoom = Math.min(zoom * 1.3, 5);
+    fgRef.current?.zoom(newZoom, 500);
+    setZoom(newZoom);
+  }, [zoom]);
+
+  const handleZoomOut = useCallback(() => {
+    const newZoom = Math.max(zoom / 1.3, 0.3);
+    fgRef.current?.zoom(newZoom, 500);
+    setZoom(newZoom);
+  }, [zoom]);
+
+  const handleReset = useCallback(() => {
+    fgRef.current?.zoomToFit(500, 30);
+    setZoom(1);
+    if (pinnedNode) {
+      (pinnedNode as any).fx = undefined;
+      (pinnedNode as any).fy = undefined;
+      setPinnedNode(null);
+    }
+  }, [pinnedNode]);
+
+  // Node type counts for legend
+  const nodeTypeCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    data.nodes.forEach(node => {
+      const type = node.type || (node.is_red ? 'threat' : 'device');
+      counts[type] = (counts[type] || 0) + 1;
+    });
+    return counts;
+  }, [data.nodes]);
+
+  if (!data.nodes || data.nodes.length === 0) {
+    return (
+      <div className="force-graph-container" style={{ height }}>
+        <EmptyState
+          variant="graph"
+          heading="No network data"
+          description="Graph data is being generated or no connections detected"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="force-graph-container" style={{ height }}>
+      <div className="force-graph-canvas-wrapper">
+        <ForceGraph2D
+          ref={fgRef}
+          graphData={data as any}
+          backgroundColor="transparent"
+          nodeRelSize={6}
+          nodeCanvasObject={nodeCanvasObject}
+          nodeCanvasObjectMode={() => 'after'}
+          linkColor={getLinkColor}
+          linkWidth={getLinkWidth}
+          linkDirectionalArrowLength={0}
+          d3VelocityDecay={0.4}
+          cooldownTicks={100}
+          warmupTicks={50}
+          onNodeHover={handleNodeHover}
+          onNodeClick={handleNodeClick}
+          onBackgroundClick={handleBackgroundClick}
+          onEngineStop={() => {
+            fgRef.current?.zoomToFit(500, 30);
+            setIsLoading(false);
+          }}
+        />
+
+        {/* Loading state */}
+        {isLoading && (
+          <div className="force-graph-loading">
+            <Skeleton variant="rectangular" width="100%" height={height} />
+          </div>
+        )}
+
+        {/* Hover tooltip */}
+        {hoveredNode && (
+          <div
+            className="force-graph-tooltip"
+            style={{
+              left: (hoveredNode.x || 0) + 20,
+              top: hoveredNode.y || 0,
+            }}
+          >
+            <div className="force-graph-tooltip__title">{hoveredNode.label || hoveredNode.id}</div>
+            <div className="force-graph-tooltip__row">
+              <span className="force-graph-tooltip__label">Type:</span>
+              <span className="force-graph-tooltip__value">{hoveredNode.type || 'device'}</span>
+            </div>
+            {hoveredNode.risk_score !== undefined && (
+              <div className="force-graph-tooltip__row">
+                <span className="force-graph-tooltip__label">Risk:</span>
+                <span className="force-graph-tooltip__value">{(hoveredNode.risk_score * 100).toFixed(0)}%</span>
+              </div>
+            )}
+            {hoveredNode.connections !== undefined && (
+              <div className="force-graph-tooltip__row">
+                <span className="force-graph-tooltip__label">Connections:</span>
+                <span className="force-graph-tooltip__value">{hoveredNode.connections}</span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Controls */}
+      <div className="force-graph-controls">
+        <Tooltip content="Zoom in" position="left">
+          <Button variant="secondary" size="sm" onClick={handleZoomIn}><ZoomIn size={14} /></Button>
+        </Tooltip>
+        <Tooltip content="Zoom out" position="left">
+          <Button variant="secondary" size="sm" onClick={handleZoomOut}><ZoomOut size={14} /></Button>
+        </Tooltip>
+        <Tooltip content="Reset view" position="left">
+          <Button variant="secondary" size="sm" onClick={handleReset}><RefreshCcw size={14} /></Button>
+        </Tooltip>
+      </div>
+
+      {/* Legend */}
+      <div className="force-graph-legend">
+        <div className="force-graph-legend__title">Node Types</div>
+        {Object.entries(NODE_COLORS).map(([type, colors]) => {
+          const count = nodeTypeCounts[type] || 0;
+          if (count === 0) return null;
+          return (
+            <div key={type} className="force-graph-legend__item">
+              <span
+                className="force-graph-legend__color"
+                style={{ background: colors.fill, borderColor: colors.stroke }}
+              />
+              <span className="force-graph-legend__label">
+                {type.charAt(0).toUpperCase() + type.slice(1)}
+              </span>
+              <Badge variant="neutral" size="sm">{count}</Badge>
+            </div>
+          );
+        })}
+        <div className="force-graph-legend__divider" />
+        <div className="force-graph-legend__item">
+          <span className="force-graph-legend__size-label">Size = Risk Level</span>
+        </div>
+      </div>
+    </div>
+  );
+}

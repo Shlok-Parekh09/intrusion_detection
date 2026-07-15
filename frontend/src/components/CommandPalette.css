@@ -1,0 +1,187 @@
+/* ═══════════════════════════════════════════════════════════════════
+   CommandPalette Component — Phase 6
+   Features: fuzzy search, keyboard navigation, ⌘K shortcut
+   ═══════════════════════════════════════════════════════════════════ */
+
+.command-palette {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── SEARCH ──────────────────────────────────────────────────────── */
+.command-palette__search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.command-palette__search-icon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.command-palette__input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: var(--font-sans);
+  font-size: var(--text-lg);
+  color: var(--text-primary);
+}
+
+.command-palette__input::placeholder {
+  color: var(--text-secondary);
+}
+
+.command-palette__kbd {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+/* ─── LIST ────────────────────────────────────────────────────────── */
+.command-palette__list {
+  list-style: none;
+  margin: 0;
+  padding: 8px 0;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.command-palette__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.command-palette__item:hover,
+.command-palette__item--selected {
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.command-palette__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.command-palette__icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.command-palette__content {
+  flex: 1;
+  min-width: 0;
+}
+
+.command-palette__label {
+  display: block;
+  font-size: var(--text-base);
+  font-weight: var(--font-medium);
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.command-palette__category {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  text-transform: capitalize;
+}
+
+.command-palette__shortcut {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+/* ─── EMPTY STATE ─────────────────────────────────────────────────── */
+.command-palette__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  color: var(--text-muted);
+  gap: 12px;
+}
+
+.command-palette__empty p {
+  font-size: var(--text-sm);
+  margin: 0;
+}
+
+/* ─── FOOTER ──────────────────────────────────────────────────────── */
+.command-palette__footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border-color);
+  background: rgba(0, 0, 0, 0.2);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.command-palette__footer-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  margin: 0 4px;
+}
+
+/* ─── SCROLLBAR ───────────────────────────────────────────────────── */
+.command-palette__list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.command-palette__list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.command-palette__list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+/* ─── REDUCED MOTION ──────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .command-palette__item {
+    transition: none;
+  }
+}

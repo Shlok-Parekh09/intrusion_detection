@@ -1,57 +1,30 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-
 /* ═══════════════════════════════════════════════════════════════════
    XAGE XPAM — Enterprise Privileged Access Management Dashboard
    ═══════════════════════════════════════════════════════════════════ */
 
-:root {
-  /* Sidebar */
-  --sidebar-bg: #1a1f2e;
-  --sidebar-active: #2563eb;
-  --sidebar-hover: rgba(255, 255, 255, 0.06);
-  --sidebar-text: #8892a4;
-  --sidebar-text-active: #ffffff;
-  --sidebar-width: 240px;
-  --sidebar-collapsed: 64px;
+/* Import design tokens first */
+@import './styles/tokens.css';
 
-  /* Main area */
-  --bg-main: #0f1219;
-  --bg-card: #161b26;
-  --bg-card-hover: #1c2233;
-  --bg-header: #131720;
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
-  /* Borders */
-  --border-color: rgba(255, 255, 255, 0.08);
-  --border-active: rgba(37, 99, 235, 0.5);
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
 
-  /* Text */
-  --text-primary: #e8eaed;
-  --text-secondary: #8892a4;
-  --text-muted: #5a6478;
-  --text-heading: #ffffff;
-
-  /* Status colors */
-  --success: #22c55e;
-  --success-bg: rgba(34, 197, 94, 0.12);
-  --warning: #f59e0b;
-  --warning-bg: rgba(245, 158, 11, 0.12);
-  --danger: #ef4444;
-  --danger-bg: rgba(239, 68, 68, 0.12);
-  --info: #3b82f6;
-  --info-bg: rgba(59, 130, 246, 0.12);
-
-  /* Charts */
-  --chart-bar-success: #22c55e;
-  --chart-bar-fail: #ef4444;
-  --chart-grid: rgba(255, 255, 255, 0.05);
-
-  /* Misc */
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
-  --transition: all 0.2s ease;
+body {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 * {
@@ -91,7 +64,12 @@ body {
   flex-direction: column;
   border-right: 1px solid var(--border-color);
   z-index: 100;
-  transition: var(--transition);
+  transition: width var(--duration-base) var(--ease-standard);
+  position: relative;
+}
+
+.sidebar--collapsed {
+  width: var(--sidebar-collapsed);
 }
 
 .sidebar-logo {
@@ -235,6 +213,61 @@ body {
 .sidebar-footer .user-role {
   font-size: 11px;
   color: var(--text-muted);
+}
+
+/* Sidebar collapse button */
+.sidebar-collapse-btn {
+  position: absolute;
+  right: -12px;
+  bottom: 20px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--duration-fast) var(--ease-standard);
+  z-index: var(--z-sticky);
+}
+
+.sidebar-collapse-btn:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+  border-color: var(--border-active);
+}
+
+.sidebar-collapse-btn__icon--rotated {
+  transform: rotate(180deg);
+}
+
+.sidebar--collapsed .sidebar-logo {
+  justify-content: center;
+  padding: 20px 0;
+}
+
+.sidebar--collapsed .sidebar-footer {
+  justify-content: center;
+  padding: 16px 0;
+}
+
+.sidebar--collapsed .sidebar-footer .user-info {
+  display: none;
+}
+
+.sidebar--collapsed .nav-item {
+  justify-content: center;
+  padding: 10px 0;
+}
+
+.sidebar--collapsed .nav-item .nav-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  margin-left: 0;
 }
 
 /* ─── MAIN CONTENT AREA ──────────────────────────────── */
@@ -636,6 +669,14 @@ body {
   position: relative;
 }
 
+.graph-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 280px;
+}
+
 /* ─── DEVICE CARDS ───────────────────────────────────── */
 .devices-grid {
   display: grid;
@@ -769,4 +810,165 @@ body {
   .sidebar { display: none; }
   .stats-row { grid-template-columns: 1fr; }
   .devices-grid { grid-template-columns: 1fr; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PHASE 1 ENHANCEMENTS — Typography, Utilities, Focus States
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ─── TYPOGRAPHY UTILITIES ───────────────────────────────────────── */
+.text-xs { font-size: var(--text-xs); }
+.text-sm { font-size: var(--text-sm); }
+.text-base { font-size: var(--text-base); }
+.text-lg { font-size: var(--text-lg); }
+.text-xl { font-size: var(--text-xl); }
+.text-2xl { font-size: var(--text-2xl); }
+.text-3xl { font-size: var(--text-3xl); }
+
+.font-normal { font-weight: var(--font-normal); }
+.font-medium { font-weight: var(--font-medium); }
+.font-semibold { font-weight: var(--font-semibold); }
+.font-bold { font-weight: var(--font-bold); }
+.font-extrabold { font-weight: var(--font-extrabold); }
+
+.font-mono { font-family: var(--font-mono); }
+
+.leading-none { line-height: var(--leading-none); }
+.leading-tight { line-height: var(--leading-tight); }
+.leading-snug { line-height: var(--leading-snug); }
+.leading-normal { line-height: var(--leading-normal); }
+
+/* ─── FOCUS STATES (WCAG AA) ─────────────────────────────────────── */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+button:focus-visible,
+[role="button"]:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+
+button.destructive:focus-visible {
+  box-shadow: var(--focus-ring-danger);
+}
+
+/* ─── NUMERIC DISPLAY (JetBrains Mono) ───────────────────────────── */
+.numeric-display {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* ─── GRADIENT BORDERS ───────────────────────────────────────────── */
+.gradient-border {
+  position: relative;
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+}
+
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-md);
+  padding: 1px;
+  background: var(--gradient-border);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* ─── GLASS SURFACE (elevated only: modals, dropdowns, popovers) ─── */
+.glass-surface {
+  background: var(--surface-glass-bg);
+  backdrop-filter: blur(var(--surface-glass-blur));
+  -webkit-backdrop-filter: blur(var(--surface-glass-blur));
+  border: 1px solid var(--surface-glass-border);
+  box-shadow: var(--surface-glass-shadow);
+}
+
+/* ─── GLOW EFFECTS ───────────────────────────────────────────────── */
+.glow-blue { box-shadow: var(--shadow-glow); }
+.glow-danger { box-shadow: var(--shadow-glow-danger); }
+.glow-success { box-shadow: var(--shadow-glow-success); }
+
+/* ─── ANIMATION UTILITIES ────────────────────────────────────────── */
+.transition-fast { transition: var(--transition-fast); }
+.transition-base { transition: var(--transition-base); }
+.transition-slow { transition: var(--transition-slow); }
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--bg-card) 0%,
+    rgba(255, 255, 255, 0.03) 50%,
+    var(--bg-card) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(0.8); opacity: 1; }
+  100% { transform: scale(2); opacity: 0; }
+}
+
+.pulse-ring {
+  position: relative;
+}
+
+.pulse-ring::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.slide-up {
+  animation: slide-up var(--duration-base) var(--ease-out);
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.fade-in {
+  animation: fade-in var(--duration-base) var(--ease-out);
+}
+
+/* ─── ACCESSIBILITY ──────────────────────────────────────────────── */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }

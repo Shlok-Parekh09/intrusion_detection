@@ -1,0 +1,253 @@
+/* ═══════════════════════════════════════════════════════════════════
+   NotificationBell Component — Phase 6
+   Features: unread badge, dropdown panel, mark all read
+   ═══════════════════════════════════════════════════════════════════ */
+
+.notification-bell-wrapper {
+  position: relative;
+}
+
+.notification-bell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: 
+    background-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+  position: relative;
+}
+
+.notification-bell:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+}
+
+.notification-bell:focus-visible {
+  box-shadow: var(--focus-ring);
+  outline: none;
+}
+
+.notification-bell__badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 4px;
+  background: var(--danger);
+  color: white;
+  font-size: 9px;
+  font-weight: var(--font-bold);
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--bg-header);
+}
+
+/* ─── DROPDOWN ────────────────────────────────────────────────────── */
+.notification-bell__dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  width: 360px;
+  max-height: 480px;
+  margin-top: 8px;
+  background: var(--surface-glass-bg);
+  backdrop-filter: blur(var(--surface-glass-blur));
+  -webkit-backdrop-filter: blur(var(--surface-glass-blur));
+  border: 1px solid var(--surface-glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  z-index: var(--z-dropdown);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: slide-up var(--duration-base) var(--ease-out);
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ─── HEADER ──────────────────────────────────────────────────────── */
+.notification-bell__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.notification-bell__title {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--text-heading);
+}
+
+.notification-bell__mark-read {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: 
+    background-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+}
+
+.notification-bell__mark-read:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+}
+
+/* ─── LIST ────────────────────────────────────────────────────────── */
+.notification-bell__list {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 400px;
+}
+
+/* ─── NOTIFICATION ITEM ───────────────────────────────────────────── */
+.notification-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.notification-item:hover {
+  background: rgba(59, 130, 246, 0.04);
+}
+
+.notification-item--unread {
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.notification-item--unread:hover {
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.notification-item__indicator {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: white;
+  font-weight: var(--font-bold);
+}
+
+.notification-item__content {
+  flex: 1;
+  min-width: 0;
+}
+
+.notification-item__title {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.notification-item__message {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.notification-item__time {
+  display: block;
+  font-size: 9px;
+  color: var(--text-muted);
+}
+
+.notification-item__unread-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--info);
+  margin-top: 4px;
+}
+
+/* ─── EMPTY STATE ─────────────────────────────────────────────────── */
+.notification-bell__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  color: var(--text-muted);
+  gap: 12px;
+}
+
+.notification-bell__empty p {
+  font-size: var(--text-sm);
+  margin: 0;
+}
+
+/* ─── SCROLLBAR ───────────────────────────────────────────────────── */
+.notification-bell__list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.notification-bell__list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.notification-bell__list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+/* ─── RESPONSIVE ──────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .notification-bell__dropdown {
+    right: -100px;
+    width: 320px;
+  }
+}
+
+/* ─── REDUCED MOTION ──────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .notification-bell__dropdown {
+    animation: none;
+  }
+  
+  .notification-item {
+    transition: none;
+  }
+}

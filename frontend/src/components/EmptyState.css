@@ -1,0 +1,74 @@
+/* ═══════════════════════════════════════════════════════════════════
+   EmptyState Component — Phase 6
+   Variants: table, search, alerts, graph, generic
+   Features: inline SVG illustration, heading, description, action button
+   ═══════════════════════════════════════════════════════════════════ */
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.empty-state__illustration {
+  width: 120px;
+  height: 120px;
+  margin-bottom: 24px;
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
+.empty-state__illustration svg {
+  width: 100%;
+  height: 100%;
+}
+
+.empty-state__heading {
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  color: var(--text-heading);
+  margin: 0 0 8px 0;
+  line-height: var(--leading-tight);
+}
+
+.empty-state__description {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin: 0 0 24px 0;
+  line-height: var(--leading-normal);
+}
+
+.empty-state__action {
+  flex-shrink: 0;
+}
+
+/* ─── VARIANT MODIFIERS ───────────────────────────────────────────── */
+.empty-state--compact {
+  padding: 32px 20px;
+}
+
+.empty-state--compact .empty-state__illustration {
+  width: 80px;
+  height: 80px;
+  margin-bottom: 16px;
+}
+
+.empty-state--compact .empty-state__heading {
+  font-size: var(--text-base);
+}
+
+.empty-state--compact .empty-state__description {
+  font-size: var(--text-xs);
+}
+
+/* ─── RESPONSIVE ──────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .empty-state {
+    padding: 32px 16px;
+  }
+}

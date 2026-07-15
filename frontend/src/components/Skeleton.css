@@ -1,0 +1,105 @@
+/* ═══════════════════════════════════════════════════════════════════
+   Skeleton Component — Phase 2
+   Variants: text, circular, rectangular, card, table-row
+   Features: shimmer animation, shape variants
+   ═══════════════════════════════════════════════════════════════════ */
+
+.skeleton {
+  background: var(--bg-card);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+/* ─── ANIMATED SHIMMER ────────────────────────────────────────────── */
+.skeleton--animated {
+  position: relative;
+  overflow: hidden;
+}
+
+.skeleton--animated::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.03) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* ─── TEXT VARIANT ────────────────────────────────────────────────── */
+.skeleton--text {
+  height: 14px;
+  width: 100%;
+}
+
+/* ─── CIRCULAR VARIANT ────────────────────────────────────────────── */
+.skeleton--circular {
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ─── RECTANGULAR VARIANT ─────────────────────────────────────────── */
+.skeleton--rectangular {
+  border-radius: var(--radius-md);
+}
+
+/* ─── CARD VARIANT ────────────────────────────────────────────────── */
+.skeleton--card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.skeleton__card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.skeleton__card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ─── TABLE ROW VARIANT ───────────────────────────────────────────── */
+.skeleton--table-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* ─── SKELETON LIST ───────────────────────────────────────────────── */
+.skeleton-list {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── REDUCED MOTION ──────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton--animated::after {
+    animation: none;
+  }
+}

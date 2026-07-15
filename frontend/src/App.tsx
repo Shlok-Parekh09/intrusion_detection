@@ -1,5 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
-import ForceGraph2D from 'react-force-graph-2d';
+import { useEffect, useState } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
   PieChart, Pie, Cell
@@ -7,11 +6,14 @@ import {
 import {
   LayoutDashboard, Shield, Users, Monitor, Clock, FileText, Activity,
   AlertTriangle, ShieldCheck, ShieldAlert, Cpu, Network, Lock, Unlock,
-  ChevronUp, ChevronDown, Bell, TrendingUp, Eye, WifiOff, Search,
-  UserX, UserCheck, KeyRound, RotateCcw, Ban, ToggleLeft, ToggleRight,
-  Trash2, X
+  ChevronUp, ChevronDown, Bell, TrendingUp, Eye, Search,
+  Trash2, X, ChevronRight, ToggleLeft, ToggleRight
 } from 'lucide-react';
 import './index.css';
+
+// Import components
+import { StatCard, Button, Table, Skeleton, Breadcrumbs, ErrorBoundary, NotificationBell, UserMenu, useCommandPalette, ForceGraphEnhanced } from './components';
+import { useToast, ToastContainer } from './components/Toast';
 
 const API = 'http://127.0.0.1:8000';
 
@@ -49,14 +51,35 @@ function App() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [graphData, setGraphData] = useState({ nodes: [] as any[], links: [] as any[] });
   const [clock, setClock] = useState(new Date());
-  const [toast, setToast] = useState<string | null>(null);
-  const fgRef = useRef<any>();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Toast hook
+  const { toasts, removeToast } = useToast();
+
+  // Command palette
+  const commandItems = [
+    { id: 'dashboard', label: 'Dashboard', category: 'page' as const, onSelect: () => setPage('dashboard') },
+    { id: 'users', label: 'Users & Access', category: 'page' as const, onSelect: () => setPage('users') },
+    { id: 'policies', label: 'Policies', category: 'page' as const, onSelect: () => setPage('policies') },
+    { id: 'devices', label: 'Devices', category: 'page' as const, onSelect: () => setPage('devices') },
+    { id: 'sessions', label: 'Sessions', category: 'page' as const, onSelect: () => setPage('sessions') },
+    { id: 'audit', label: 'Audit Logs', category: 'page' as const, onSelect: () => setPage('audit') },
+  ];
+  const { CommandPaletteComponent } = useCommandPalette(commandItems);
 
   // Clock
   useEffect(() => { const t = setInterval(() => setClock(new Date()), 1000); return () => clearInterval(t); }, []);
 
-  // Toast auto-dismiss
-  useEffect(() => { if (toast) { const t = setTimeout(() => setToast(null), 3000); return () => clearTimeout(t); } }, [toast]);
+  // Load sidebar state
+  useEffect(() => {
+    const saved = localStorage.getItem('sidebar-collapsed');
+    if (saved) setSidebarCollapsed(JSON.parse(saved));
+  }, []);
+
+  // Save sidebar state
+  useEffect(() => {
+    localStorage.setItem('sidebar-collapsed', JSON.stringify(sidebarCollapsed));
+  }, [sidebarCollapsed]);
 
   // Fetch live data
   useEffect(() => {
@@ -75,28 +98,23 @@ function App() {
   // Graph once
   useEffect(() => { fetch(`${API}/api/graph`).then(r => r.json()).then(d => { if (d.nodes) setGraphData(d); }).catch(() => {}); }, []);
 
-  const onEngineStop = useCallback(() => { fgRef.current?.zoomToFit(400, 30); }, []);
-
   // API actions
   const userAction = async (uid: string, action: string, reason?: string) => {
-    const r = await fetch(`${API}/api/v1/users/${uid}/action`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, reason }) });
-    const d = await r.json();
-    setToast(d.message || `Action ${action} completed`);
-    // Refresh users
+    await fetch(`${API}/api/v1/users/${uid}/action`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, reason }) });
     fetch(`${API}/api/v1/users`).then(r => r.json()).then(d => { if (Array.isArray(d)) setUsers(d); });
     fetch(`${API}/api/v1/events?limit=50`).then(r => r.json()).then(d => { if (Array.isArray(d)) setEvents(d); });
   };
 
   const togglePolicy = async (pid: string, enabled: boolean) => {
     await fetch(`${API}/api/v1/policies/${pid}/toggle`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled }) });
-    setToast(`Policy ${enabled ? 'enabled' : 'disabled'}`);
+    // toast.info(`Policy ${enabled ? 'enabled' : 'disabled'}`);
     fetch(`${API}/api/v1/policies`).then(r => r.json()).then(d => { if (Array.isArray(d)) setPolicies(d); });
     fetch(`${API}/api/v1/events?limit=50`).then(r => r.json()).then(d => { if (Array.isArray(d)) setEvents(d); });
   };
 
   const killSession = async (agentId: string) => {
     await fetch(`${API}/api/v1/sessions/${agentId}/kill`, { method: 'POST' });
-    setToast(`Session ${agentId} terminated`);
+    // toast.warning(`Session ${agentId} terminated`);
     fetch(`${API}/api/v1/sessions`).then(r => r.json()).then(d => { if (Array.isArray(d)) setSessions(d); });
     fetch(`${API}/api/v1/events?limit=50`).then(r => r.json()).then(d => { if (Array.isArray(d)) setEvents(d); });
   };
@@ -106,16 +124,26 @@ function App() {
   const highRiskUsers = users.filter(u => u.risk_score >= 0.5).length;
   let curSection = '';
 
+  const getPageBreadcrumb = () => {
+    const pageItem = NAV_ITEMS.find(n => n.id === page);
+    return [
+      { label: 'Home', onClick: () => setPage('dashboard') },
+      { label: pageItem?.label || 'Dashboard' }
+    ];
+  };
+
   return (
     <div className="app-layout">
       {/* ═══ SIDEBAR ═══ */}
-      <aside className="sidebar">
+      <aside className={`sidebar ${sidebarCollapsed ? 'sidebar--collapsed' : ''}`}>
         <div className="sidebar-logo">
-          <div className="logo-icon"><ShieldCheck size={18} /></div>
-          <div className="logo-text">
-            <span className="logo-name">VORTEX</span>
-            <span className="logo-sub">XPAM Security</span>
-          </div>
+          <div className="logo-icon"><ShieldCheck size={sidebarCollapsed ? 24 : 18} /></div>
+          {!sidebarCollapsed && (
+            <div className="logo-text">
+              <span className="logo-name">VORTEX</span>
+              <span className="logo-sub">XPAM Security</span>
+            </div>
+          )}
         </div>
         <nav className="sidebar-nav">
           {NAV_ITEMS.map(item => {
@@ -123,30 +151,35 @@ function App() {
             if (show) curSection = item.section!;
             const Icon = item.icon;
             return (<div key={item.id}>
-              {show && <div className="nav-section-label">{item.section}</div>}
-              <div className={`nav-item ${page === item.id ? 'active' : ''}`} onClick={() => setPage(item.id)}>
+              {show && !sidebarCollapsed && <div className="nav-section-label">{item.section}</div>}
+              <div className={`nav-item ${page === item.id ? 'active' : ''}`} onClick={() => setPage(item.id)} title={sidebarCollapsed ? item.label : undefined}>
                 <Icon className="nav-icon" size={16} />
-                {item.label}
-                {item.id === 'users' && highRiskUsers > 0 && <span className="nav-badge">{highRiskUsers}</span>}
-                {item.id === 'audit' && criticals > 0 && <span className="nav-badge">{criticals}</span>}
+                {!sidebarCollapsed && item.label}
+                {item.id === 'users' && highRiskUsers > 0 && !sidebarCollapsed && <span className="nav-badge">{highRiskUsers}</span>}
+                {item.id === 'audit' && criticals > 0 && !sidebarCollapsed && <span className="nav-badge">{criticals}</span>}
               </div>
             </div>);
           })}
         </nav>
         <div className="sidebar-footer">
           <div className="user-avatar">SP</div>
-          <div className="user-info">
-            <span className="user-name">Shlok Parekh</span>
-            <span className="user-role">SOC Admin</span>
-          </div>
+          {!sidebarCollapsed && (
+            <div className="user-info">
+              <span className="user-name">Shlok Parekh</span>
+              <span className="user-role">SOC Admin</span>
+            </div>
+          )}
         </div>
+        <button className="sidebar-collapse-btn" onClick={() => setSidebarCollapsed(!sidebarCollapsed)} title={sidebarCollapsed ? 'Expand' : 'Collapse'}>
+          <ChevronRight size={16} className={sidebarCollapsed ? 'sidebar-collapse-btn__icon--rotated' : ''} />
+        </button>
       </aside>
 
       {/* ═══ MAIN ═══ */}
       <div className="main-area">
         <header className="top-bar">
           <div className="top-bar-left">
-            <span className="page-title">{NAV_ITEMS.find(n => n.id === page)?.label || 'Dashboard'}</span>
+            <Breadcrumbs items={getPageBreadcrumb()} />
           </div>
           <div className="top-bar-right">
             <div className={`top-bar-badge ${locked > 0 ? 'danger' : 'secure'}`}>
@@ -154,21 +187,35 @@ function App() {
               {locked > 0 ? `${locked} Threat(s)` : 'Secure'}
             </div>
             <div className="top-bar-badge secure"><Lock size={11} /> QPC</div>
+            <NotificationBell notifications={events.slice(0, 5).map(e => ({
+              id: `${e.time}-${e.agent_id}`,
+              title: e.severity,
+              message: e.message,
+              severity: e.severity === 'CRITICAL' ? 'error' : e.severity === 'WARNING' ? 'warning' : 'info' as any,
+              timestamp: e.time * 1000,
+              read: false,
+            }))} />
+            <UserMenu userName="Shlok Parekh" userRole="SOC Admin" />
             <span className="system-time">{clock.toLocaleTimeString('en-US', { hour12: false })}</span>
           </div>
         </header>
 
         <div className="dashboard-content">
-          {page === 'dashboard' && <PageDashboard endpoints={endpoints} events={events} graphData={graphData} fgRef={fgRef} onEngineStop={onEngineStop} users={users} locked={locked} criticals={criticals} sessions={sessions} />}
-          {page === 'users' && <PageUsers users={users} userAction={userAction} />}
-          {page === 'policies' && <PagePolicies policies={policies} togglePolicy={togglePolicy} />}
-          {page === 'devices' && <PageDevices endpoints={endpoints} />}
-          {page === 'sessions' && <PageSessions sessions={sessions} killSession={killSession} />}
-          {page === 'audit' && <PageAudit events={events} />}
+          <ErrorBoundary name="PageContent">
+            {page === 'dashboard' && <PageDashboard endpoints={endpoints} events={events} graphData={graphData} users={users} locked={locked} criticals={criticals} />}
+            {page === 'users' && <PageUsers users={users} userAction={userAction} />}
+            {page === 'policies' && <PagePolicies policies={policies} togglePolicy={togglePolicy} />}
+            {page === 'devices' && <PageDevices endpoints={endpoints} />}
+            {page === 'sessions' && <PageSessions sessions={sessions} killSession={killSession} />}
+            {page === 'audit' && <PageAudit events={events} />}
+          </ErrorBoundary>
         </div>
 
-        {/* Toast */}
-        {toast && <div className="toast">{toast}</div>}
+        {/* Toast Container */}
+        <ToastContainer toasts={toasts} removeToast={removeToast} />
+        
+        {/* Command Palette */}
+        <CommandPaletteComponent />
       </div>
     </div>
   );
@@ -177,7 +224,7 @@ function App() {
 // ═══════════════════════════════════════════════════════════════════
 // DASHBOARD
 // ═══════════════════════════════════════════════════════════════════
-function PageDashboard({ endpoints, events, graphData, fgRef, onEngineStop, users, locked, criticals, sessions }: any) {
+function PageDashboard({ endpoints, events, graphData, users, locked, criticals }: any) {
   const trends = [];
   const now = new Date();
   for (let i = 6; i >= 0; i--) {
@@ -192,12 +239,12 @@ function PageDashboard({ endpoints, events, graphData, fgRef, onEngineStop, user
   ];
 
   return (<>
-    {/* Stats */}
+    {/* Stats - Using new StatCard component */}
     <div className="stats-row">
       <StatCard icon={<Monitor size={18} />} iconClass="blue" label="Active Endpoints" value={endpoints.length} sub={<><Cpu size={11} /> QPC Encrypted</>} />
-      <StatCard icon={<AlertTriangle size={18} />} iconClass="red" label="Active Threats" value={locked} valueColor={locked > 0 ? '#ef4444' : undefined} sub={locked > 0 ? <><ChevronUp size={11} /> RBAC Lockout</> : <><ChevronDown size={11} /> Clear</>} subClass={locked > 0 ? 'up' : 'down'} />
-      <StatCard icon={<Users size={18} />} iconClass="yellow" label="High-Risk Users" value={users.filter((u: any) => u.risk_score >= 0.5).length} valueColor={users.filter((u: any) => u.risk_score >= 0.5).length > 0 ? '#f59e0b' : undefined} sub={<><Eye size={11} /> Behavioral AI</>} />
-      <StatCard icon={<Bell size={18} />} iconClass="red" label="Critical Alerts" value={criticals} valueColor={criticals > 0 ? '#ef4444' : undefined} sub={criticals > 0 ? <><ChevronUp size={11} /> Needs attention</> : <>All clear</>} subClass={criticals > 0 ? 'up' : 'neutral'} />
+      <StatCard icon={<AlertTriangle size={18} />} iconClass="red" label="Active Threats" value={locked} sub={locked > 0 ? <><ChevronUp size={11} /> RBAC Lockout</> : <><ChevronDown size={11} /> Clear</>} subClass={locked > 0 ? 'up' : 'down'} />
+      <StatCard icon={<Users size={18} />} iconClass="yellow" label="High-Risk Users" value={users.filter((u: any) => u.risk_score >= 0.5).length} sub={<><Eye size={11} /> Behavioral AI</>} />
+      <StatCard icon={<Bell size={18} />} iconClass="red" label="Critical Alerts" value={criticals} sub={criticals > 0 ? <><ChevronUp size={11} /> Needs attention</> : <>All clear</>} subClass={criticals > 0 ? 'up' : 'neutral'} />
     </div>
 
     {/* Charts row */}
@@ -237,24 +284,18 @@ function PageDashboard({ endpoints, events, graphData, fgRef, onEngineStop, user
     <div className="grid-2col">
       <div className="panel">
         <div className="panel-header"><span className="panel-title"><Network size={14} /> Threat Topology</span><span className="panel-subtitle">{graphData.nodes.length} nodes</span></div>
-        <div className="panel-body"><div className="graph-container" style={{ minHeight: 280 }}>
-          <ForceGraph2D ref={fgRef} graphData={graphData} nodeRelSize={3} backgroundColor="transparent"
-            nodeCanvasObjectMode={() => 'after'}
-            nodeCanvasObject={(node: any, ctx: CanvasRenderingContext2D, gs: number) => {
-              const r = node.is_red ? 3.5 : 2.5;
-              ctx.beginPath(); ctx.arc(node.x, node.y, r, 0, 2 * Math.PI, false);
-              ctx.fillStyle = node.is_red ? '#ef4444' : '#3b82f6'; ctx.fill();
-              if (node.is_red) { ctx.strokeStyle = 'rgba(239,68,68,0.3)'; ctx.lineWidth = 1.5; ctx.stroke(); }
-              if (gs > 1.5) { ctx.font = `${8 / gs}px Inter`; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fillText(node.label, node.x, node.y + r + 1); }
-            }}
-            linkColor={() => 'rgba(255,255,255,0.04)'} linkWidth={0.4} d3VelocityDecay={0.3} cooldownTicks={80} onEngineStop={onEngineStop}
+        <div className="panel-body"><div className="graph-container" style={{ minHeight: 400 }}>
+          <ForceGraphEnhanced
+            data={graphData}
+            height={400}
+            onNodeClick={() => {}}
           />
         </div></div>
       </div>
       <div className="panel">
         <div className="panel-header"><span className="panel-title"><FileText size={14} /> Live Activity</span><span className="panel-subtitle">{events.length}</span></div>
         <div className="panel-body"><div className="activity-feed">
-          {events.length === 0 && <div style={{ textAlign: 'center', padding: 30, color: 'var(--text-muted)' }}>Awaiting events...</div>}
+          {events.length === 0 && <div style={{ textAlign: 'center', padding: 30, color: 'var(--text-muted)' }}><Skeleton variant="text" lines={3} /></div>}
           {events.slice(0, 12).map((ev: Event, i: number) => (
             <div className="activity-item" key={i}>
               <div className={`activity-icon ${ev.severity === 'CRITICAL' ? 'danger' : 'info'}`}>
@@ -282,10 +323,10 @@ function PageDashboard({ endpoints, events, graphData, fgRef, onEngineStop, user
               <span className={`badge ${ep.status === 'LOCKED' ? 'badge-danger' : 'badge-success'}`}>{ep.status === 'LOCKED' ? <Lock size={9} /> : <Unlock size={9} />} {ep.status}</span>
             </div>
             <div className="device-metrics">
-              <div className="device-metric"><span className="device-metric-label">CPU</span><span className="device-metric-value">{ep.cpu?.toFixed(0)}%</span><div className="progress-bar"><div className={`progress-fill ${progClass(ep.cpu)}`} style={{ width: `${Math.min(ep.cpu, 100)}%` }} /></div></div>
-              <div className="device-metric"><span className="device-metric-label">RAM</span><span className="device-metric-value">{ep.ram?.toFixed(0)}%</span><div className="progress-bar"><div className={`progress-fill ${progClass(ep.ram)}`} style={{ width: `${Math.min(ep.ram, 100)}%` }} /></div></div>
-              <div className="device-metric"><span className="device-metric-label">Conns</span><span className="device-metric-value">{ep.net_conns}</span></div>
-              <div className="device-metric"><span className="device-metric-label">Risk</span><span className="device-metric-value" style={{ color: ep.risk_score > 1.5 ? '#ef4444' : '#22c55e' }}>{ep.risk_score?.toFixed(1)}</span></div>
+              <div className="device-metric"><span className="device-metric-label">CPU</span><span className="device-metric-value numeric-display">{ep.cpu?.toFixed(0)}%</span><div className="progress-bar"><div className={`progress-fill ${progClass(ep.cpu)}`} style={{ width: `${Math.min(ep.cpu, 100)}%` }} /></div></div>
+              <div className="device-metric"><span className="device-metric-label">RAM</span><span className="device-metric-value numeric-display">{ep.ram?.toFixed(0)}%</span><div className="progress-bar"><div className={`progress-fill ${progClass(ep.ram)}`} style={{ width: `${Math.min(ep.ram, 100)}%` }} /></div></div>
+              <div className="device-metric"><span className="device-metric-label">Conns</span><span className="device-metric-value numeric-display">{ep.net_conns}</span></div>
+              <div className="device-metric"><span className="device-metric-label">Risk</span><span className="device-metric-value numeric-display" style={{ color: ep.risk_score > 1.5 ? '#ef4444' : '#22c55e' }}>{ep.risk_score?.toFixed(1)}</span></div>
             </div>
           </div>
         ))}
@@ -294,19 +335,10 @@ function PageDashboard({ endpoints, events, graphData, fgRef, onEngineStop, user
   </>);
 }
 
-function StatCard({ icon, iconClass, label, value, valueColor, sub, subClass }: any) {
-  return (<div className="stat-card">
-    <div className={`stat-icon ${iconClass}`}>{icon}</div>
-    <div className="stat-label">{label}</div>
-    <div className="stat-value" style={{ color: valueColor }}>{value}</div>
-    <div className={`stat-change ${subClass || 'neutral'}`}>{sub}</div>
-  </div>);
-}
-
 // ═══════════════════════════════════════════════════════════════════
-// USERS PAGE — Full Insider Threat Management
+// USERS PAGE
 // ═══════════════════════════════════════════════════════════════════
-function PageUsers({ users, userAction }: { users: ManagedUser[]; userAction: (uid: string, action: string, reason?: string) => void }) {
+function PageUsers({ users }: { users: ManagedUser[]; userAction?: (uid: string, action: string, reason?: string) => void }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
   const [behaviorData, setBehaviorData] = useState<any>(null);
@@ -325,52 +357,41 @@ function PageUsers({ users, userAction }: { users: ManagedUser[]; userAction: (u
     } catch { setBehaviorData(null); }
   };
 
+  const userColumns = [
+    { key: 'risk', header: 'Risk', width: 80, render: (u: ManagedUser) => <span className={`badge ${riskBadge(u.risk_score)}`} style={{ minWidth: 50, justifyContent: 'center' }}>{(u.risk_score * 100).toFixed(0)}%</span> },
+    { key: 'name', header: 'User', width: 200, render: (u: ManagedUser) => <div><div style={{ fontWeight: 600, fontSize: 13 }}>{u.name}</div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{u.id}</div></div> },
+    { key: 'role', header: 'Role', width: 120 },
+    { key: 'department', header: 'Dept', width: 100 },
+    { key: 'access_level', header: 'Access', width: 100, render: (u: ManagedUser) => <span className={`badge ${u.access_level === 'Privileged' ? 'badge-warning' : u.access_level === 'None' ? 'badge-danger' : 'badge-neutral'}`}>{u.access_level}</span> },
+    { key: 'status', header: 'Status', width: 120, render: (u: ManagedUser) => <span className={`badge ${statusBadge(u.status)}`}>{u.status}</span> },
+    { key: 'mfa', header: 'MFA', width: 60, render: (u: ManagedUser) => u.mfa ? <span className="badge badge-success">On</span> : <span className="badge badge-danger">Off</span> },
+    { key: 'files_accessed_today', header: 'Files', width: 60 },
+    { key: 'logins', header: 'Logins', width: 80, render: (u: ManagedUser) => <span>{u.login_count_today} <span style={{ color: u.failed_logins_today >= 3 ? '#ef4444' : 'var(--text-muted)', fontSize: 11 }}>({u.failed_logins_today}F)</span></span> },
+  ];
+
   return (<div style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
-    {/* User List */}
     <div className="panel" style={{ flex: selected ? 3 : 1, minWidth: 0 }}>
       <div className="panel-header">
         <span className="panel-title"><Users size={14} /> User & Access Management</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ position: 'relative' }}>
-            <Search size={13} style={{ position: 'absolute', left: 8, top: 7, color: 'var(--text-muted)' }} />
-            <input type="text" placeholder="Search users..." value={filter} onChange={e => setFilter(e.target.value)}
-              style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: 4, padding: '5px 8px 5px 28px', color: 'var(--text-primary)', fontSize: 12, width: 180, outline: 'none' }} />
-          </div>
+        <div style={{ position: 'relative' }}>
+          <Search size={13} style={{ position: 'absolute', left: 8, top: 7, color: 'var(--text-muted)' }} />
+          <input type="text" placeholder="Search users..." value={filter} onChange={e => setFilter(e.target.value)}
+            style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: 4, padding: '5px 8px 5px 28px', color: 'var(--text-primary)', fontSize: 12, width: 180, outline: 'none' }} />
         </div>
       </div>
       <div className="panel-body">
-        <table className="data-table">
-          <thead><tr><th>Risk</th><th>User</th><th>Role</th><th>Dept</th><th>Access</th><th>Status</th><th>MFA</th><th>Files</th><th>Logins</th><th>Actions</th></tr></thead>
-          <tbody>
-            {filtered.map(u => (
-              <tr key={u.id} onClick={() => loadBehavior(u.id)} style={{ cursor: 'pointer', background: selected === u.id ? 'rgba(59,130,246,0.08)' : undefined }}>
-                <td><span className={`badge ${riskBadge(u.risk_score)}`} style={{ minWidth: 50, justifyContent: 'center' }}>{(u.risk_score * 100).toFixed(0)}%</span></td>
-                <td><div style={{ fontWeight: 600, fontSize: 13 }}>{u.name}</div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{u.id}</div></td>
-                <td style={{ fontSize: 12 }}>{u.role}</td>
-                <td style={{ fontSize: 12 }}>{u.department}</td>
-                <td><span className={`badge ${u.access_level === 'Privileged' ? 'badge-warning' : u.access_level === 'None' ? 'badge-danger' : 'badge-neutral'}`}>{u.access_level}</span></td>
-                <td><span className={`badge ${statusBadge(u.status)}`}>{u.status}</span></td>
-                <td>{u.mfa ? <span className="badge badge-success">On</span> : <span className="badge badge-danger">Off</span>}</td>
-                <td style={{ fontVariantNumeric: 'tabular-nums' }}>{u.files_accessed_today}</td>
-                <td style={{ fontVariantNumeric: 'tabular-nums' }}>{u.login_count_today} <span style={{ color: u.failed_logins_today >= 3 ? '#ef4444' : 'var(--text-muted)', fontSize: 11 }}>({u.failed_logins_today}F)</span></td>
-                <td>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    {u.status === 'active' && <ActionBtn icon={<Lock size={11} />} color="#ef4444" title="Lock Account" onClick={e => { e.stopPropagation(); userAction(u.id, 'lock', 'Manual lock by admin'); }} />}
-                    {u.status !== 'active' && u.status !== 'revoked' && <ActionBtn icon={<Unlock size={11} />} color="#22c55e" title="Unlock" onClick={e => { e.stopPropagation(); userAction(u.id, 'unlock'); }} />}
-                    {u.status === 'active' && <ActionBtn icon={<Eye size={11} />} color="#f59e0b" title="Investigate" onClick={e => { e.stopPropagation(); userAction(u.id, 'investigate', 'Suspicious behavior'); }} />}
-                    {!u.mfa && <ActionBtn icon={<KeyRound size={11} />} color="#3b82f6" title="Force MFA" onClick={e => { e.stopPropagation(); userAction(u.id, 'force_mfa'); }} />}
-                    {u.status !== 'revoked' && <ActionBtn icon={<Ban size={11} />} color="#ef4444" title="Revoke All Access" onClick={e => { e.stopPropagation(); userAction(u.id, 'revoke_access', 'Insider threat confirmed'); }} />}
-                    <ActionBtn icon={<RotateCcw size={11} />} color="#8892a4" title="Reset Risk" onClick={e => { e.stopPropagation(); userAction(u.id, 'reset_risk'); }} />
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <Table
+          data={filtered}
+          columns={userColumns as any}
+          emptyMessage="No users found"
+          pageSize={15}
+          virtualScroll
+          virtualScrollHeight={400}
+          onRowClick={(u: ManagedUser) => loadBehavior(u.id)}
+        />
       </div>
     </div>
 
-    {/* Behavioral Analysis Panel */}
     {selected && behaviorData && <div className="panel" style={{ flex: 2, minWidth: 280 }}>
       <div className="panel-header">
         <span className="panel-title"><TrendingUp size={14} /> Behavioral Analysis</span>
@@ -384,7 +405,6 @@ function PageUsers({ users, userAction }: { users: ManagedUser[]; userAction: (u
           <div><div style={{ fontWeight: 600, fontSize: 15 }}>{behaviorData.name}</div><div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Risk: {riskLabel(behaviorData.risk_score)}</div></div>
         </div>
 
-        {/* Anomaly indicators */}
         {behaviorData.anomalies && Object.entries(behaviorData.anomalies).map(([key, data]: [string, any]) => (
           <div key={key} style={{ background: data.flagged ? 'rgba(239,68,68,0.06)' : 'rgba(0,0,0,0.15)', border: `1px solid ${data.flagged ? 'rgba(239,68,68,0.2)' : 'var(--border-color)'}`, borderRadius: 6, padding: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
@@ -397,10 +417,6 @@ function PageUsers({ users, userAction }: { users: ManagedUser[]; userAction: (u
               Current: <strong>{data.current}</strong> | Baseline: {data.baseline}
               {data.deviation !== undefined && <span style={{ color: data.deviation > 100 ? '#ef4444' : 'var(--text-muted)', marginLeft: 4 }}>({data.deviation > 0 ? '+' : ''}{data.deviation}%)</span>}
             </div>}
-            {data.failed !== undefined && <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Failed: <strong style={{ color: data.failed >= 3 ? '#ef4444' : 'inherit' }}>{data.failed}</strong></div>}
-            {data.detected !== undefined && <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Detected: <strong>{data.detected ? 'Yes' : 'No'}</strong></div>}
-            {data.count !== undefined && <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Attempts: <strong>{data.count}</strong></div>}
-            {data.enabled !== undefined && <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Enabled: <strong>{data.enabled ? 'Yes' : 'No'}</strong></div>}
           </div>
         ))}
       </div>
@@ -408,36 +424,27 @@ function PageUsers({ users, userAction }: { users: ManagedUser[]; userAction: (u
   </div>);
 }
 
-function ActionBtn({ icon, color, title, onClick }: any) {
-  return <button onClick={onClick} title={title} style={{ background: 'rgba(0,0,0,0.3)', border: `1px solid ${color}33`, borderRadius: 4, padding: '3px 6px', cursor: 'pointer', color, display: 'flex', alignItems: 'center', transition: 'all 0.15s' }}>{icon}</button>;
-}
-
 // ═══════════════════════════════════════════════════════════════════
 // POLICIES PAGE
 // ═══════════════════════════════════════════════════════════════════
 function PagePolicies({ policies, togglePolicy }: { policies: Policy[]; togglePolicy: (pid: string, enabled: boolean) => void }) {
+  const policyColumns = [
+    { key: 'enabled', header: 'Enabled', width: 80, render: (p: Policy) => (
+      <button onClick={() => togglePolicy(p.id, !p.enabled)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: p.enabled ? '#22c55e' : '#ef4444', padding: 2, display: 'flex' }} title={p.enabled ? 'Disable' : 'Enable'}>
+        {p.enabled ? <ToggleRight size={20} /> : <ToggleLeft size={20} />}
+      </button>
+    )},
+    { key: 'name', header: 'Policy', width: 250, render: (p: Policy) => <span style={{ fontWeight: 500, opacity: p.enabled ? 1 : 0.5 }}>{p.name}</span> },
+    { key: 'category', header: 'Category', width: 120, render: (p: Policy) => <span className="badge badge-neutral">{p.category}</span> },
+    { key: 'scope', header: 'Scope', width: 150 },
+    { key: 'enforcement', header: 'Enforcement', width: 120, render: (p: Policy) => <span className="badge badge-info">{p.enforcement}</span> },
+    { key: 'violations', header: 'Violations', width: 100, render: (p: Policy) => p.violations > 0 ? <span className="badge badge-danger">{p.violations}</span> : <span style={{ color: 'var(--text-muted)' }}>0</span> },
+  ];
+
   return (<div className="panel" style={{ flex: 1 }}>
     <div className="panel-header"><span className="panel-title"><Shield size={14} /> Security Policies</span><span className="panel-subtitle">{policies.filter(p => p.enabled).length}/{policies.length} active</span></div>
     <div className="panel-body">
-      <table className="data-table">
-        <thead><tr><th>Enabled</th><th>Policy</th><th>Category</th><th>Scope</th><th>Enforcement</th><th>Violations</th></tr></thead>
-        <tbody>
-          {policies.map(p => (
-            <tr key={p.id}>
-              <td>
-                <button onClick={() => togglePolicy(p.id, !p.enabled)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: p.enabled ? '#22c55e' : '#ef4444', padding: 2, display: 'flex' }} title={p.enabled ? 'Disable' : 'Enable'}>
-                  {p.enabled ? <ToggleRight size={20} /> : <ToggleLeft size={20} />}
-                </button>
-              </td>
-              <td style={{ fontWeight: 500, opacity: p.enabled ? 1 : 0.5 }}>{p.name}</td>
-              <td><span className="badge badge-neutral">{p.category}</span></td>
-              <td style={{ fontSize: 12 }}>{p.scope}</td>
-              <td><span className="badge badge-info">{p.enforcement}</span></td>
-              <td>{p.violations > 0 ? <span className="badge badge-danger">{p.violations}</span> : <span style={{ color: 'var(--text-muted)' }}>0</span>}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <Table data={policies} columns={policyColumns as any} emptyMessage="No policies configured" pageSize={20} />
     </div>
   </div>);
 }
@@ -446,27 +453,21 @@ function PagePolicies({ policies, togglePolicy }: { policies: Policy[]; togglePo
 // DEVICES PAGE
 // ═══════════════════════════════════════════════════════════════════
 function PageDevices({ endpoints }: { endpoints: Endpoint[] }) {
+  const deviceColumns = [
+    { key: 'status', header: '', width: 40, render: (ep: Endpoint) => <span className={`status-dot ${ep.status === 'LOCKED' ? 'danger' : 'online'}`} /> },
+    { key: 'agent_id', header: 'Device ID', width: 180, render: (ep: Endpoint) => <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--info)', fontWeight: 600 }}>{ep.agent_id}</span> },
+    { key: 'protocol', header: 'Protocol', width: 120, render: () => <span className="badge badge-neutral">QPC-AES-256</span> },
+    { key: 'cpu', header: 'CPU', width: 120, render: (ep: Endpoint) => <span>{ep.cpu?.toFixed(1)}%<div className="progress-bar" style={{ width: 60 }}><div className={`progress-fill ${progClass(ep.cpu)}`} style={{ width: `${Math.min(ep.cpu, 100)}%` }} /></div></span> },
+    { key: 'ram', header: 'RAM', width: 120, render: (ep: Endpoint) => <span>{ep.ram?.toFixed(1)}%<div className="progress-bar" style={{ width: 60 }}><div className={`progress-fill ${progClass(ep.ram)}`} style={{ width: `${Math.min(ep.ram, 100)}%` }} /></div></span> },
+    { key: 'net_conns', header: 'Connections', width: 100 },
+    { key: 'risk_score', header: 'Risk', width: 80, render: (ep: Endpoint) => <span style={{ color: ep.risk_score > 1.5 ? '#ef4444' : '#22c55e', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{ep.risk_score?.toFixed(2)}</span> },
+    { key: 'status', header: 'RBAC', width: 120, render: (ep: Endpoint) => <span className={`badge ${ep.status === 'LOCKED' ? 'badge-danger' : 'badge-success'}`}>{ep.status === 'LOCKED' ? <Lock size={10} /> : <Unlock size={10} />} {ep.status}</span> },
+  ];
+
   return (<div className="panel" style={{ flex: 1 }}>
     <div className="panel-header"><span className="panel-title"><Monitor size={14} /> Device Registry</span><span className="panel-subtitle">{endpoints.length} connected</span></div>
     <div className="panel-body">
-      <table className="data-table">
-        <thead><tr><th></th><th>Device ID</th><th>Protocol</th><th>CPU</th><th>RAM</th><th>Connections</th><th>Risk</th><th>RBAC</th></tr></thead>
-        <tbody>
-          {endpoints.map((ep, i) => (
-            <tr key={i}>
-              <td><span className={`status-dot ${ep.status === 'LOCKED' ? 'danger' : 'online'}`} /></td>
-              <td style={{ fontFamily: 'monospace', color: 'var(--info)', fontWeight: 600 }}>{ep.agent_id}</td>
-              <td><span className="badge badge-neutral">QPC-AES-256</span></td>
-              <td>{ep.cpu?.toFixed(1)}%<div className="progress-bar" style={{ width: 60 }}><div className={`progress-fill ${progClass(ep.cpu)}`} style={{ width: `${Math.min(ep.cpu, 100)}%` }} /></div></td>
-              <td>{ep.ram?.toFixed(1)}%<div className="progress-bar" style={{ width: 60 }}><div className={`progress-fill ${progClass(ep.ram)}`} style={{ width: `${Math.min(ep.ram, 100)}%` }} /></div></td>
-              <td>{ep.net_conns}</td>
-              <td style={{ color: ep.risk_score > 1.5 ? '#ef4444' : '#22c55e', fontWeight: 600 }}>{ep.risk_score?.toFixed(2)}</td>
-              <td><span className={`badge ${ep.status === 'LOCKED' ? 'badge-danger' : 'badge-success'}`}>{ep.status === 'LOCKED' ? <Lock size={10} /> : <Unlock size={10} />} {ep.status}</span></td>
-            </tr>
-          ))}
-          {endpoints.length === 0 && <tr><td colSpan={8} style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}><WifiOff size={20} style={{ marginBottom: 4, opacity: 0.4 }} /><br />No devices connected</td></tr>}
-        </tbody>
-      </table>
+      <Table data={endpoints} columns={deviceColumns as any} emptyMessage="No devices connected" pageSize={15} virtualScroll virtualScrollHeight={400} />
     </div>
   </div>);
 }
@@ -475,28 +476,29 @@ function PageDevices({ endpoints }: { endpoints: Endpoint[] }) {
 // SESSIONS PAGE
 // ═══════════════════════════════════════════════════════════════════
 function PageSessions({ sessions, killSession }: { sessions: Session[]; killSession: (agentId: string) => void }) {
+  const sessionColumns = [
+    { key: 'status', header: '', width: 40, render: (s: Session) => <span className={`status-dot ${s.status === 'active' ? 'online' : s.status === 'killed' ? 'danger' : 'offline'}`} /> },
+    { key: 'id', header: 'Session', width: 200, render: (s: Session) => <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>{s.id}</span> },
+    { key: 'agent_id', header: 'Agent', width: 150, render: (s: Session) => <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--info)' }}>{s.agent_id}</span> },
+    { key: 'protocol', header: 'Protocol', width: 100, render: (s: Session) => <span className="badge badge-neutral">{s.protocol}</span> },
+    { key: 'duration', header: 'Duration', width: 100, render: (s: Session) => <span style={{ fontVariantNumeric: 'tabular-nums' }}>{Math.floor(s.duration_seconds / 60)}m {s.duration_seconds % 60}s</span> },
+    { key: 'idle', header: 'Idle', width: 80, render: (s: Session) => <span style={{ fontVariantNumeric: 'tabular-nums', color: s.idle_seconds > 30 ? '#f59e0b' : 'var(--text-muted)' }}>{s.idle_seconds}s</span> },
+    { key: 'bytes', header: 'Data', width: 100, render: (s: Session) => fmtBytes(s.bytes_transferred) },
+    { key: 'status', header: 'Status', width: 100, render: (s: Session) => <span className={`badge ${s.status === 'active' ? 'badge-success' : 'badge-danger'}`}>{s.status}</span> },
+    { key: 'action', header: 'Action', width: 80, render: (s: Session) => s.status === 'active' && <Button               variant="ghost"
+              size="sm"
+              onClick={() => killSession(s.agent_id)}
+              title="Kill Session"
+              className="destructive"
+            >
+              <Trash2 size={11} />
+            </Button> },
+  ];
+
   return (<div className="panel" style={{ flex: 1 }}>
     <div className="panel-header"><span className="panel-title"><Clock size={14} /> Active Sessions</span><span className="panel-subtitle">{sessions.filter(s => s.status === 'active').length} active</span></div>
     <div className="panel-body">
-      <table className="data-table">
-        <thead><tr><th></th><th>Session</th><th>Agent</th><th>Protocol</th><th>Duration</th><th>Idle</th><th>Data</th><th>Status</th><th>Action</th></tr></thead>
-        <tbody>
-          {sessions.map(s => (
-            <tr key={s.id}>
-              <td><span className={`status-dot ${s.status === 'active' ? 'online' : s.status === 'killed' ? 'danger' : 'offline'}`} /></td>
-              <td style={{ fontFamily: 'monospace', fontSize: 11 }}>{s.id}</td>
-              <td style={{ fontFamily: 'monospace', color: 'var(--info)' }}>{s.agent_id}</td>
-              <td><span className="badge badge-neutral">{s.protocol}</span></td>
-              <td style={{ fontVariantNumeric: 'tabular-nums' }}>{Math.floor(s.duration_seconds / 60)}m {s.duration_seconds % 60}s</td>
-              <td style={{ fontVariantNumeric: 'tabular-nums', color: s.idle_seconds > 30 ? '#f59e0b' : 'var(--text-muted)' }}>{s.idle_seconds}s</td>
-              <td>{fmtBytes(s.bytes_transferred)}</td>
-              <td><span className={`badge ${s.status === 'active' ? 'badge-success' : 'badge-danger'}`}>{s.status}</span></td>
-              <td>{s.status === 'active' && <ActionBtn icon={<Trash2 size={11} />} color="#ef4444" title="Kill Session" onClick={() => killSession(s.agent_id)} />}</td>
-            </tr>
-          ))}
-          {sessions.length === 0 && <tr><td colSpan={9} style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>No sessions</td></tr>}
-        </tbody>
-      </table>
+      <Table data={sessions} columns={sessionColumns as any} emptyMessage="No active sessions" pageSize={15} />
     </div>
   </div>);
 }
@@ -507,11 +509,20 @@ function PageSessions({ sessions, killSession }: { sessions: Session[]; killSess
 function PageAudit({ events }: { events: Event[] }) {
   const [filter, setFilter] = useState('');
   const [sevFilter, setSevFilter] = useState('all');
+  
   const filtered = events.filter(e => {
     if (sevFilter !== 'all' && e.severity !== sevFilter) return false;
     if (filter && !e.message.toLowerCase().includes(filter.toLowerCase()) && !e.agent_id.toLowerCase().includes(filter.toLowerCase())) return false;
     return true;
   });
+
+  const auditColumns = [
+    { key: 'time', header: 'Time', width: 120, render: (e: Event) => <span style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--text-muted)', fontSize: 12, whiteSpace: 'nowrap' }}>{fmtTime(e.time)}</span> },
+    { key: 'agent_id', header: 'Source', width: 150, render: (e: Event) => <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--info)', fontSize: 12 }}>{e.agent_id}</span> },
+    { key: 'message', header: 'Event', width: 400 },
+    { key: 'category', header: 'Category', width: 120, render: (e: Event) => <span className="badge badge-neutral" style={{ fontSize: 9 }}>{e.category || 'system'}</span> },
+    { key: 'severity', header: 'Severity', width: 100, render: (e: Event) => <span className={`badge ${e.severity === 'CRITICAL' ? 'badge-danger' : e.severity === 'WARNING' ? 'badge-warning' : 'badge-info'}`}>{e.severity}</span> },
+  ];
 
   return (<div className="panel" style={{ flex: 1 }}>
     <div className="panel-header">
@@ -531,21 +542,7 @@ function PageAudit({ events }: { events: Event[] }) {
       </div>
     </div>
     <div className="panel-body">
-      <table className="data-table">
-        <thead><tr><th>Time</th><th>Source</th><th>Event</th><th>Category</th><th>Severity</th></tr></thead>
-        <tbody>
-          {filtered.map((ev, i) => (
-            <tr key={i}>
-              <td style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--text-muted)', fontSize: 12, whiteSpace: 'nowrap' }}>{fmtTime(ev.time)}</td>
-              <td style={{ fontFamily: 'monospace', color: 'var(--info)', fontSize: 12 }}>{ev.agent_id}</td>
-              <td style={{ fontSize: 12 }}>{ev.message}</td>
-              <td><span className="badge badge-neutral" style={{ fontSize: 9 }}>{ev.category || 'system'}</span></td>
-              <td><span className={`badge ${ev.severity === 'CRITICAL' ? 'badge-danger' : ev.severity === 'WARNING' ? 'badge-warning' : 'badge-info'}`}>{ev.severity}</span></td>
-            </tr>
-          ))}
-          {filtered.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>No matching events</td></tr>}
-        </tbody>
-      </table>
+      <Table data={filtered} columns={auditColumns as any} emptyMessage="No matching events" pageSize={20} virtualScroll virtualScrollHeight={500} />
     </div>
   </div>);
 }

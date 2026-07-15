@@ -1,0 +1,150 @@
+/* ═══════════════════════════════════════════════════════════════════
+   Tabs Component — Phase 6
+   Features: animated underline, icon support, badge, disabled state
+   ═══════════════════════════════════════════════════════════════════ */
+
+.tabs-wrapper {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.tabs-wrapper--full {
+  justify-content: stretch;
+}
+
+.tabs {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  overflow: visible;
+}
+
+/* ─── TAB BUTTON ──────────────────────────────────────────────────── */
+.tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  cursor: pointer;
+  transition: 
+    color var(--duration-base) var(--ease-standard),
+    background-color var(--duration-base) var(--ease-standard);
+  z-index: 1;
+  white-space: nowrap;
+}
+
+.tab:hover:not(.tab--disabled) {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.tab--active {
+  color: var(--text-primary);
+}
+
+.tab--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tab:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--focus-ring);
+  border-radius: var(--radius-md);
+}
+
+/* ─── ICON ────────────────────────────────────────────────────────── */
+.tab__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.tab__icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ─── LABEL ───────────────────────────────────────────────────────── */
+.tab__label {
+  line-height: 1;
+}
+
+/* ─── BADGE ───────────────────────────────────────────────────────── */
+.tab__badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  background: var(--danger);
+  color: white;
+  font-size: 10px;
+  font-weight: var(--font-bold);
+  border-radius: var(--radius-full);
+}
+
+/* ─── ANIMATED UNDERLINE ──────────────────────────────────────────── */
+.tab__underline {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--gradient-primary), var(--gradient-secondary));
+  border-radius: 2px 2px 0 0;
+  transition: 
+    width var(--duration-base) var(--ease-out),
+    transform var(--duration-base) var(--ease-out);
+  will-change: width, transform;
+}
+
+/* ─── FULL WIDTH ──────────────────────────────────────────────────── */
+.tabs-wrapper--full .tabs {
+  width: 100%;
+}
+
+.tabs-wrapper--full .tab {
+  flex: 1;
+  justify-content: center;
+}
+
+/* ─── RESPONSIVE ──────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .tab {
+    padding: 8px 12px;
+    font-size: var(--text-xs);
+  }
+  
+  .tab__label {
+    display: none;
+  }
+  
+  .tab__icon {
+    margin-right: 0;
+  }
+}
+
+/* ─── REDUCED MOTION ──────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .tab__underline {
+    transition: none;
+  }
+  
+  .tab {
+    transition: none;
+  }
+}

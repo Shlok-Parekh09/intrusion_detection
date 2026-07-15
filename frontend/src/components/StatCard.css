@@ -1,0 +1,230 @@
+/* ═══════════════════════════════════════════════════════════════════
+   StatCard Component — Phase 2
+   Modernized with gradient border, animations, and trend indicators
+   ═══════════════════════════════════════════════════════════════════ */
+
+.stat-card--modern {
+  position: relative;
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+  overflow: hidden;
+  transition: 
+    transform var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out),
+    border-color var(--duration-base) var(--ease-standard);
+  border: 1px solid var(--border-color);
+  cursor: default;
+}
+
+/* Gradient border effect */
+.stat-card--modern::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-md);
+  padding: 1px;
+  background: var(--gradient-border);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0.6;
+  transition: opacity var(--duration-base) var(--ease-standard);
+}
+
+/* Subtle gradient background */
+.stat-card__gradient-bg {
+  position: absolute;
+  inset: 0;
+  background: var(--gradient-glow);
+  opacity: 0;
+  transition: opacity var(--duration-base) var(--ease-standard);
+  pointer-events: none;
+}
+
+/* Hover state */
+.stat-card--modern:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg), var(--shadow-glow);
+  border-color: var(--border-active);
+}
+
+.stat-card--modern:hover::before {
+  opacity: 1;
+}
+
+.stat-card--modern:hover .stat-card__gradient-bg {
+  opacity: 1;
+}
+
+/* Icon */
+.stat-card__icon {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.8;
+  transition: 
+    transform var(--duration-base) var(--ease-bounce),
+    opacity var(--duration-fast) var(--ease-standard);
+}
+
+.stat-card--modern:hover .stat-card__icon {
+  transform: scale(1.1);
+  opacity: 1;
+}
+
+.stat-card__icon--blue {
+  background: var(--info-bg);
+  color: var(--info);
+}
+
+.stat-card__icon--red {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.stat-card__icon--green {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.stat-card__icon--yellow {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+
+.stat-card__icon--purple {
+  background: rgba(139, 92, 246, 0.12);
+  color: #8b5cf6;
+}
+
+/* Label */
+.stat-card__label {
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 6px;
+  line-height: var(--leading-normal);
+}
+
+/* Value */
+.stat-card__value {
+  font-size: 28px;
+  font-weight: var(--font-extrabold);
+  color: var(--text-heading);
+  line-height: var(--leading-tight);
+  margin-bottom: 8px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* Sub text (legacy support) */
+.stat-card__sub {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.stat-card__sub--up {
+  color: var(--danger);
+}
+
+.stat-card__sub--down {
+  color: var(--success);
+}
+
+.stat-card__sub--neutral {
+  color: var(--text-muted);
+}
+
+/* Trend indicator (NEW) */
+.stat-card__trend {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  width: fit-content;
+}
+
+.stat-card__trend--positive {
+  color: var(--success);
+  background: var(--success-bg);
+}
+
+.stat-card__trend--negative {
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+
+.stat-card__trend-arrow {
+  font-size: 10px;
+  line-height: 1;
+}
+
+.stat-card__trend-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-card__trend-label {
+  font-weight: var(--font-normal);
+  color: var(--text-secondary);
+  margin-left: 2px;
+}
+
+/* Animation for value count-up */
+@keyframes count-up {
+  from {
+    opacity: 0.5;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stat-card__value {
+  animation: count-up var(--duration-slow) var(--ease-out);
+}
+
+/* Focus state for accessibility */
+.stat-card--modern:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring), var(--shadow-lg);
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .stat-card--modern {
+    transition: none;
+  }
+  
+  .stat-card--modern:hover {
+    transform: none;
+  }
+  
+  .stat-card__icon {
+    transition: none;
+  }
+  
+  .stat-card__value {
+    animation: none;
+  }
+}

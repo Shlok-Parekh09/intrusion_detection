@@ -158,12 +158,16 @@ def main():
             buf, is_tmp = _download_to_buffer(url, size, name)
             if is_tmp:
                 tmp_path = buf.name
+                buf.close()  # Must close before passing path to HF
 
             dl_time = time.time() - t0
             print(f"      Downloaded in {dl_time:.0f}s. Uploading to HuggingFace ...", flush=True)
 
+            # For temp files, pass the path string; for BytesIO, pass the buffer
+            upload_target = tmp_path if is_tmp else buf
+
             api.upload_file(
-                path_or_fileobj=buf,
+                path_or_fileobj=upload_target,
                 path_in_repo=name,
                 repo_id=repo_id,
                 repo_type="dataset",

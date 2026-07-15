@@ -321,24 +321,24 @@ body {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 24px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 14px;
 }
 
 /* ─── STAT CARDS ROW ─────────────────────────────────── */
 .stats-row {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
+  gap: 12px;
 }
 
 .stat-card {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  padding: 20px;
+  padding: 14px 16px;
   transition: var(--transition);
   position: relative;
   overflow: hidden;
@@ -350,19 +350,19 @@ body {
 }
 
 .stat-card .stat-label {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 
 .stat-card .stat-value {
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 700;
   color: var(--text-heading);
-  line-height: 1.2;
+  line-height: 1.1;
 }
 
 .stat-card .stat-change {
@@ -380,15 +380,15 @@ body {
 
 .stat-card .stat-icon {
   position: absolute;
-  top: 16px;
-  right: 16px;
-  width: 40px;
-  height: 40px;
+  top: 12px;
+  right: 12px;
+  width: 34px;
+  height: 34px;
   border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
-  opacity: 0.8;
+  opacity: 0.7;
 }
 
 .stat-card .stat-icon.blue { background: var(--info-bg); color: var(--info); }
@@ -411,10 +411,10 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 20px;
+  padding: 10px 14px;
   border-bottom: 1px solid var(--border-color);
   background: rgba(0, 0, 0, 0.15);
-  min-height: 48px;
+  min-height: 40px;
 }
 
 .panel-header .panel-title {
@@ -445,19 +445,19 @@ body {
 .grid-2col {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: 12px;
 }
 
 .grid-3col {
   display: grid;
   grid-template-columns: 2fr 1fr 1fr;
-  gap: 16px;
+  gap: 12px;
 }
 
 .grid-main {
   display: grid;
   grid-template-columns: 3fr 2fr;
-  gap: 16px;
+  gap: 12px;
 }
 
 /* ─── DATA TABLE ─────────────────────────────────────── */
@@ -563,8 +563,8 @@ body {
 /* ─── TRENDS CHART ───────────────────────────────────── */
 .chart-container {
   width: 100%;
-  height: 260px;
-  padding: 16px;
+  height: 220px;
+  padding: 12px;
 }
 
 /* ─── ACTIVITY FEED ──────────────────────────────────── */
@@ -733,6 +733,28 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.2);
+}
+
+/* ─── TOAST NOTIFICATION ─────────────────────────────── */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: #1a1f2e;
+  border: 1px solid var(--success);
+  color: var(--text-primary);
+  padding: 10px 20px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  z-index: 9999;
+  animation: toast-in 0.3s ease;
+}
+
+@keyframes toast-in {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
 }
 
 /* ─── RESPONSIVE ─────────────────────────────────────── */

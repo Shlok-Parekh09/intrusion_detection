@@ -1,0 +1,500 @@
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+import pandas as pd
+import os
+import networkx as nx
+import base64
+import json
+import time
+import random
+from typing import Optional
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+app = FastAPI(title="Quantum-Secure Enterprise SIEM")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+DATA_DIR = 'data'
+SHARED_QUANTUM_SAFE_KEY = b'12345678901234567890123456789012'
+
+# ═══════════════════════════════════════════════════════════════════
+# In-memory state
+# ═══════════════════════════════════════════════════════════════════
+active_endpoints = {}
+live_events = []
+
+# Managed users with behavioral analytics
+managed_users = {
+    "admin-shlok": {
+        "id": "admin-shlok", "name": "Shlok Parekh", "role": "SOC Administrator",
+        "group": "Admins", "department": "Security", "access_level": "Privileged",
+        "status": "active", "mfa": True, "risk_score": 0.12,
+        "login_count_today": 3, "failed_logins_today": 0,
+        "files_accessed_today": 12, "after_hours_activity": False,
+        "usb_attempts": 0, "last_login": time.time() - 1800,
+        "behavioral_baseline": {"avg_files": 15, "avg_logins": 4, "avg_hours": 8},
+    },
+    "analyst-01": {
+        "id": "analyst-01", "name": "Priya Sharma", "role": "Security Analyst",
+        "group": "Analysts", "department": "SOC", "access_level": "Standard",
+        "status": "active", "mfa": True, "risk_score": 0.25,
+        "login_count_today": 5, "failed_logins_today": 1,
+        "files_accessed_today": 45, "after_hours_activity": False,
+        "usb_attempts": 0, "last_login": time.time() - 600,
+        "behavioral_baseline": {"avg_files": 30, "avg_logins": 5, "avg_hours": 9},
+    },
+    "contractor-02": {
+        "id": "contractor-02", "name": "James Wilson", "role": "External Contractor",
+        "group": "Contractors", "department": "IT Services", "access_level": "Limited",
+        "status": "active", "mfa": False, "risk_score": 0.65,
+        "login_count_today": 8, "failed_logins_today": 3,
+        "files_accessed_today": 120, "after_hours_activity": True,
+        "usb_attempts": 2, "last_login": time.time() - 120,
+        "behavioral_baseline": {"avg_files": 20, "avg_logins": 3, "avg_hours": 8},
+    },
+    "vendor-03": {
+        "id": "vendor-03", "name": "Chen Wei", "role": "Vendor Access",
+        "group": "Vendors", "department": "External", "access_level": "Restricted",
+        "status": "active", "mfa": True, "risk_score": 0.45,
+        "login_count_today": 2, "failed_logins_today": 0,
+        "files_accessed_today": 8, "after_hours_activity": False,
+        "usb_attempts": 0, "last_login": time.time() - 3600,
+        "behavioral_baseline": {"avg_files": 10, "avg_logins": 2, "avg_hours": 6},
+    },
+    "dba-04": {
+        "id": "dba-04", "name": "Arun Patel", "role": "Database Administrator",
+        "group": "Admins", "department": "Database", "access_level": "Privileged",
+        "status": "active", "mfa": True, "risk_score": 0.82,
+        "login_count_today": 12, "failed_logins_today": 4,
+        "files_accessed_today": 250, "after_hours_activity": True,
+        "usb_attempts": 1, "last_login": time.time() - 60,
+        "behavioral_baseline": {"avg_files": 40, "avg_logins": 6, "avg_hours": 9},
+    },
+    "intern-05": {
+        "id": "intern-05", "name": "Sara Ahmed", "role": "Intern",
+        "group": "Interns", "department": "Research", "access_level": "Minimal",
+        "status": "active", "mfa": False, "risk_score": 0.35,
+        "login_count_today": 4, "failed_logins_today": 2,
+        "files_accessed_today": 55, "after_hours_activity": True,
+        "usb_attempts": 0, "last_login": time.time() - 900,
+        "behavioral_baseline": {"avg_files": 10, "avg_logins": 2, "avg_hours": 6},
+    },
+}
+
+# Security policies
+security_policies = [
+    {"id": "pol-001", "name": "Zero Trust Endpoint Validation", "enabled": True, "scope": "All Endpoints", "enforcement": "Mandatory", "category": "Access Control", "violations": 0},
+    {"id": "pol-002", "name": "Privileged Session Recording", "enabled": True, "scope": "Admin Accounts", "enforcement": "Mandatory", "category": "Monitoring", "violations": 0},
+    {"id": "pol-003", "name": "USB Device Restriction", "enabled": True, "scope": "All Users", "enforcement": "Block", "category": "Data Protection", "violations": 3},
+    {"id": "pol-004", "name": "After-Hours Access Alert", "enabled": True, "scope": "Non-Admin Users", "enforcement": "Alert", "category": "Behavior", "violations": 2},
+    {"id": "pol-005", "name": "Multi-Factor Authentication", "enabled": True, "scope": "All Accounts", "enforcement": "Mandatory", "category": "Authentication", "violations": 1},
+    {"id": "pol-006", "name": "QPC Key Rotation (24h)", "enabled": True, "scope": "System", "enforcement": "Automated", "category": "Cryptography", "violations": 0},
+    {"id": "pol-007", "name": "Data Exfiltration Prevention", "enabled": True, "scope": "All Endpoints", "enforcement": "Block + Alert", "category": "Data Protection", "violations": 5},
+    {"id": "pol-008", "name": "Excessive File Access Detection", "enabled": True, "scope": "All Users", "enforcement": "Alert + Lock", "category": "Behavior", "violations": 4},
+    {"id": "pol-009", "name": "Failed Login Threshold (5/hr)", "enabled": True, "scope": "All Accounts", "enforcement": "Lock Account", "category": "Authentication", "violations": 2},
+    {"id": "pol-010", "name": "Privileged Escalation Monitoring", "enabled": True, "scope": "All Users", "enforcement": "Alert + Review", "category": "Access Control", "violations": 1},
+]
+
+# Active sessions tracking
+active_sessions = {}
+
+
+class TelemetryPayload(BaseModel):
+    agent_id: str
+    qpc_payload: str
+
+class UserAction(BaseModel):
+    action: str  # lock, unlock, investigate, revoke_access, force_mfa
+    reason: Optional[str] = None
+
+class PolicyToggle(BaseModel):
+    enabled: bool
+
+class SessionAction(BaseModel):
+    action: str  # kill, flag
+
+
+def qpc_decrypt(encrypted_payload_b64: str) -> dict:
+    try:
+        raw = base64.b64decode(encrypted_payload_b64)
+        nonce = raw[:12]
+        ct = raw[12:]
+        aesgcm = AESGCM(SHARED_QUANTUM_SAFE_KEY)
+        pt = aesgcm.decrypt(nonce, ct, None)
+        return json.loads(pt.decode('utf-8'))
+    except Exception as e:
+        print(f"QPC Decryption Failed: {e}")
+        return {}
+
+def load_dataset():
+    features = pd.read_csv(os.path.join(DATA_DIR, 'merged_features.csv'))
+    scores = pd.read_csv(os.path.join(DATA_DIR, 'anomaly_scores.csv'))
+    file_access = pd.read_csv(os.path.join(DATA_DIR, 'file_access.csv'), parse_dates=['access_time'])
+    df = pd.merge(features, scores, on='user')
+    if 'is_red_team_x' in df.columns:
+        df['is_red_team'] = df['is_red_team_x']
+    return df, file_access
+
+def _compute_behavioral_risk(user: dict) -> float:
+    """AI-driven behavioral risk scoring."""
+    baseline = user.get("behavioral_baseline", {})
+    risk = 0.0
+    
+    # File access anomaly
+    avg_files = baseline.get("avg_files", 20)
+    if avg_files > 0:
+        file_ratio = user["files_accessed_today"] / avg_files
+        if file_ratio > 3: risk += 0.3
+        elif file_ratio > 2: risk += 0.15
+        elif file_ratio > 1.5: risk += 0.05
+    
+    # Login anomaly
+    avg_logins = baseline.get("avg_logins", 4)
+    if avg_logins > 0:
+        login_ratio = user["login_count_today"] / avg_logins
+        if login_ratio > 3: risk += 0.2
+        elif login_ratio > 2: risk += 0.1
+    
+    # Failed logins
+    if user["failed_logins_today"] >= 5: risk += 0.3
+    elif user["failed_logins_today"] >= 3: risk += 0.15
+    elif user["failed_logins_today"] >= 1: risk += 0.05
+    
+    # After hours
+    if user["after_hours_activity"]: risk += 0.15
+    
+    # USB attempts
+    if user["usb_attempts"] > 0: risk += 0.1 * user["usb_attempts"]
+    
+    # No MFA is risky
+    if not user["mfa"]: risk += 0.1
+    
+    # Privileged accounts get extra scrutiny
+    if user["access_level"] == "Privileged": risk *= 1.2
+    
+    return min(round(risk, 2), 1.0)
+
+
+def _add_event(agent_id: str, message: str, severity: str = "INFO", category: str = "system"):
+    live_events.append({
+        "time": time.time(),
+        "agent_id": agent_id,
+        "message": message,
+        "severity": severity,
+        "category": category,
+    })
+    if len(live_events) > 200:
+        live_events.pop(0)
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Telemetry Ingestion
+# ═══════════════════════════════════════════════════════════════════
+
+@app.post("/api/v1/telemetry/ingest")
+def ingest_telemetry(payload: TelemetryPayload):
+    data = qpc_decrypt(payload.qpc_payload)
+    if not data:
+        raise HTTPException(status_code=400, detail="QPC Decapsulation Failed")
+    
+    risk_score = 0.5
+    is_red = data.get('is_red_team', False)
+    if is_red or data.get('files_per_day', 0) > 1000:
+        risk_score = 2.5
+    
+    agent_state = {
+        "agent_id": data.get("agent_id"),
+        "timestamp": data.get("timestamp"),
+        "cpu": data.get("cpu_percent"),
+        "ram": data.get("ram_percent"),
+        "net_conns": data.get("network_connections"),
+        "risk_score": risk_score,
+        "status": "LOCKED" if risk_score > 1.5 else "SECURE",
+        "last_seen": time.time()
+    }
+    
+    active_endpoints[payload.agent_id] = agent_state
+    
+    # Track session
+    if payload.agent_id not in active_sessions:
+        active_sessions[payload.agent_id] = {
+            "id": f"sess-{len(active_sessions)+1:04d}",
+            "agent_id": payload.agent_id,
+            "started": time.time(),
+            "last_activity": time.time(),
+            "status": "active",
+            "protocol": "QPC-AES-256",
+            "bytes_transferred": 0,
+        }
+    active_sessions[payload.agent_id]["last_activity"] = time.time()
+    active_sessions[payload.agent_id]["bytes_transferred"] += random.randint(1024, 65536)
+    
+    if risk_score > 1.5:
+        _add_event(payload.agent_id, "CRITICAL: Anomalous behavior detected. RBAC lockout initiated.", "CRITICAL", "threat")
+    else:
+        _add_event(payload.agent_id, "QPC heartbeat verified. Telemetry nominal.", "INFO", "telemetry")
+
+    return {"status": "success", "risk_score": risk_score, "rbac_action": agent_state["status"]}
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Live Endpoints & Events
+# ═══════════════════════════════════════════════════════════════════
+
+@app.get("/api/v1/endpoints")
+def get_endpoints():
+    now = time.time()
+    active = [ep for ep in active_endpoints.values() if now - ep["last_seen"] < 30]
+    return active
+
+@app.get("/api/v1/events")
+def get_events(category: Optional[str] = None, severity: Optional[str] = None, limit: int = 50):
+    filtered = live_events
+    if category:
+        filtered = [e for e in filtered if e.get("category") == category]
+    if severity:
+        filtered = [e for e in filtered if e["severity"] == severity]
+    return sorted(filtered, key=lambda x: x["time"], reverse=True)[:limit]
+
+
+# ═══════════════════════════════════════════════════════════════════
+# User Management (Insider Threat Control)
+# ═══════════════════════════════════════════════════════════════════
+
+@app.get("/api/v1/users")
+def get_users():
+    users = []
+    for uid, u in managed_users.items():
+        u_copy = dict(u)
+        u_copy["risk_score"] = _compute_behavioral_risk(u)
+        users.append(u_copy)
+    return sorted(users, key=lambda x: x["risk_score"], reverse=True)
+
+@app.get("/api/v1/users/{user_id}")
+def get_user(user_id: str):
+    if user_id not in managed_users:
+        raise HTTPException(status_code=404, detail="User not found")
+    u = dict(managed_users[user_id])
+    u["risk_score"] = _compute_behavioral_risk(u)
+    return u
+
+@app.post("/api/v1/users/{user_id}/action")
+def user_action(user_id: str, body: UserAction):
+    if user_id not in managed_users:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    user = managed_users[user_id]
+    action = body.action
+    reason = body.reason or "Administrative action"
+    
+    if action == "lock":
+        user["status"] = "locked"
+        _add_event("SYSTEM", f"Account LOCKED: {user['name']} ({user_id}). Reason: {reason}", "CRITICAL", "access_control")
+        return {"status": "locked", "message": f"Account {user_id} locked"}
+    
+    elif action == "unlock":
+        user["status"] = "active"
+        _add_event("SYSTEM", f"Account UNLOCKED: {user['name']} ({user_id}). Reason: {reason}", "WARNING", "access_control")
+        return {"status": "active", "message": f"Account {user_id} unlocked"}
+    
+    elif action == "investigate":
+        user["status"] = "under_investigation"
+        _add_event("SYSTEM", f"Investigation started: {user['name']} ({user_id}). {reason}", "WARNING", "investigation")
+        return {"status": "under_investigation", "message": f"Investigation started for {user_id}"}
+    
+    elif action == "revoke_access":
+        user["status"] = "revoked"
+        user["access_level"] = "None"
+        _add_event("SYSTEM", f"All access REVOKED: {user['name']} ({user_id}). {reason}", "CRITICAL", "access_control")
+        return {"status": "revoked", "message": f"Access revoked for {user_id}"}
+    
+    elif action == "force_mfa":
+        user["mfa"] = True
+        _add_event("SYSTEM", f"MFA forced on: {user['name']} ({user_id}). {reason}", "INFO", "authentication")
+        return {"status": "mfa_enabled", "message": f"MFA enforced for {user_id}"}
+    
+    elif action == "reset_risk":
+        user["failed_logins_today"] = 0
+        user["usb_attempts"] = 0
+        user["after_hours_activity"] = False
+        user["files_accessed_today"] = int(user["behavioral_baseline"]["avg_files"])
+        user["login_count_today"] = int(user["behavioral_baseline"]["avg_logins"])
+        _add_event("SYSTEM", f"Risk indicators reset: {user['name']} ({user_id})", "INFO", "access_control")
+        return {"status": "reset", "message": f"Risk indicators reset for {user_id}"}
+    
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown action: {action}")
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Policy Management
+# ═══════════════════════════════════════════════════════════════════
+
+@app.get("/api/v1/policies")
+def get_policies():
+    return security_policies
+
+@app.post("/api/v1/policies/{policy_id}/toggle")
+def toggle_policy(policy_id: str, body: PolicyToggle):
+    for pol in security_policies:
+        if pol["id"] == policy_id:
+            pol["enabled"] = body.enabled
+            action = "enabled" if body.enabled else "disabled"
+            _add_event("SYSTEM", f"Policy {action}: {pol['name']}", "WARNING", "policy")
+            return {"status": "ok", "policy": pol}
+    raise HTTPException(status_code=404, detail="Policy not found")
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Session Management
+# ═══════════════════════════════════════════════════════════════════
+
+@app.get("/api/v1/sessions")
+def get_sessions():
+    now = time.time()
+    sessions = []
+    for sid, s in active_sessions.items():
+        s_copy = dict(s)
+        s_copy["duration_seconds"] = int(now - s["started"])
+        s_copy["idle_seconds"] = int(now - s["last_activity"])
+        sessions.append(s_copy)
+    return sorted(sessions, key=lambda x: x["last_activity"], reverse=True)
+
+@app.post("/api/v1/sessions/{agent_id}/kill")
+def kill_session(agent_id: str):
+    if agent_id in active_sessions:
+        active_sessions[agent_id]["status"] = "killed"
+        _add_event("SYSTEM", f"Session terminated: {agent_id}", "WARNING", "session")
+        if agent_id in active_endpoints:
+            del active_endpoints[agent_id]
+        return {"status": "killed", "agent_id": agent_id}
+    raise HTTPException(status_code=404, detail="Session not found")
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Analytics (AI Behavioral Analysis)
+# ═══════════════════════════════════════════════════════════════════
+
+@app.get("/api/v1/analytics/risk-summary")
+def risk_summary():
+    """Get risk distribution across all users."""
+    users = []
+    risk_levels = {"critical": 0, "high": 0, "medium": 0, "low": 0}
+    for uid, u in managed_users.items():
+        risk = _compute_behavioral_risk(u)
+        if risk >= 0.8: risk_levels["critical"] += 1
+        elif risk >= 0.5: risk_levels["high"] += 1
+        elif risk >= 0.3: risk_levels["medium"] += 1
+        else: risk_levels["low"] += 1
+        users.append({"id": uid, "name": u["name"], "risk": risk, "role": u["role"]})
+    
+    return {
+        "distribution": risk_levels,
+        "users": sorted(users, key=lambda x: x["risk"], reverse=True),
+        "total_users": len(managed_users),
+        "total_threats": risk_levels["critical"] + risk_levels["high"],
+    }
+
+@app.get("/api/v1/analytics/behavior/{user_id}")
+def user_behavior(user_id: str):
+    """Detailed behavioral analysis for a user."""
+    if user_id not in managed_users:
+        raise HTTPException(status_code=404, detail="User not found")
+    u = managed_users[user_id]
+    baseline = u["behavioral_baseline"]
+    
+    return {
+        "user_id": user_id,
+        "name": u["name"],
+        "risk_score": _compute_behavioral_risk(u),
+        "anomalies": {
+            "file_access": {
+                "current": u["files_accessed_today"],
+                "baseline": baseline["avg_files"],
+                "deviation": round((u["files_accessed_today"] - baseline["avg_files"]) / max(baseline["avg_files"], 1) * 100, 1),
+                "flagged": u["files_accessed_today"] > baseline["avg_files"] * 2,
+            },
+            "login_activity": {
+                "current": u["login_count_today"],
+                "baseline": baseline["avg_logins"],
+                "failed": u["failed_logins_today"],
+                "flagged": u["login_count_today"] > baseline["avg_logins"] * 2 or u["failed_logins_today"] >= 3,
+            },
+            "after_hours": {
+                "detected": u["after_hours_activity"],
+                "flagged": u["after_hours_activity"],
+            },
+            "usb_attempts": {
+                "count": u["usb_attempts"],
+                "flagged": u["usb_attempts"] > 0,
+            },
+            "mfa_status": {
+                "enabled": u["mfa"],
+                "flagged": not u["mfa"],
+            },
+        },
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Graph / Anomaly Data (existing endpoints)
+# ═══════════════════════════════════════════════════════════════════
+
+@app.get("/api/anomalies")
+def get_anomalies(model: str = "isolation_forest", min_score: float = 0.0):
+    try:
+        df, _ = load_dataset()
+        df_filtered = df[df[model] >= min_score].copy()
+        df_sorted = df_filtered.sort_values(model, ascending=False).head(100)
+        df_sorted = df_sorted.where(pd.notnull(df_sorted), None)
+        return {
+            "total": len(df),
+            "anomalies": len(df[df[model] > 1.5]),
+            "red_team_flags": int(df['is_red_team'].sum()),
+            "data": df_sorted.to_dict(orient="records")
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.get("/api/graph")
+def get_graph():
+    try:
+        df, file_access = load_dataset()
+        attrs = {}
+        for _, row in df.iterrows():
+            anomaly = max(row['isolation_forest'], row['oneclass_svm'], row['autoencoder'])
+            red_team = row['is_red_team']
+            attrs[row['user']] = {
+                'anomaly': anomaly,
+                'red_team': red_team,
+                'high_risk': (anomaly > 1.5) or (red_team == 1)
+            }
+        G = nx.Graph()
+        for _, row in file_access.iterrows():
+            G.add_edge(row['user'], row['file'], type='access')
+        high_risk_nodes = {n for n, v in attrs.items() if v['high_risk']}
+        connected_nodes = set()
+        for node in high_risk_nodes:
+            connected_nodes.add(node)
+            connected_nodes.update(list(G.neighbors(node))[:3])
+        subG = G.subgraph(connected_nodes)
+        nodes = []
+        for n in subG.nodes():
+            n_type = "user" if n in attrs else "file"
+            risk = attrs[n]['anomaly'] if n in attrs else 0
+            is_red = bool(attrs[n]['red_team']) if n in attrs else False
+            nodes.append({
+                "id": str(n), "label": str(n), "type": n_type,
+                "risk": risk, "is_red": is_red
+            })
+        edges = [{"source": str(u), "target": str(v)} for u, v in subG.edges()]
+        return {"nodes": nodes, "links": edges}
+    except Exception as e:
+        return {"error": str(e)}

@@ -352,7 +352,7 @@ function PageDashboard({ endpoints, events, graphData, users, locked, criticals 
 // ═══════════════════════════════════════════════════════════════════
 // USERS PAGE
 // ═══════════════════════════════════════════════════════════════════
-function PageUsers({ users }: { users: ManagedUser[]; userAction?: (uid: string, action: string, reason?: string) => void }) {
+function PageUsers({ users, userAction }: { users: ManagedUser[]; userAction?: (uid: string, action: string, reason?: string) => void }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
   const [behaviorData, setBehaviorData] = useState<any>(null);
@@ -379,7 +379,7 @@ function PageUsers({ users }: { users: ManagedUser[]; userAction?: (uid: string,
     { key: 'access_level', header: 'Access', width: 100, render: (u: ManagedUser) => (
       <select 
         value={u.access_level} 
-        onChange={(e) => userAction(u.id, 'update_access', e.target.value)}
+        onChange={(e) => userAction && userAction(u.id, 'update_access', e.target.value)}
         onClick={(e) => e.stopPropagation()}
         className={`badge ${u.access_level === 'Privileged' ? 'badge-warning' : u.access_level === 'None' ? 'badge-danger' : 'badge-neutral'}`}
         style={{ cursor: 'pointer', outline: 'none', appearance: 'none', border: 'none', WebkitAppearance: 'none' }}

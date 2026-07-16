@@ -11,7 +11,7 @@ import './ForceGraph.css';
 interface GraphNode {
   id: string;
   label?: string;
-  type?: 'user' | 'device' | 'policy' | 'session' | 'threat';
+  type?: 'user' | 'device' | 'policy' | 'session' | 'threat' | 'file';
   risk_score?: number;
   connections?: number;
   is_red?: boolean;
@@ -47,9 +47,6 @@ const NODE_COLORS = {
   threat: { fill: '#ef4444', stroke: '#f87171', gradient: ['rgba(239, 68, 68, 0.9)', 'rgba(239, 68, 68, 0.15)'] },
 };
 
-const NODE_SIZE_MULTIPLIER = 1.0;
-const BASE_NODE_SIZE = 1.0;
-
 export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGraphEnhancedProps) {
   const fgRef = useRef<any>(null);
   const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
@@ -58,7 +55,7 @@ export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGra
   const [isLoading, setIsLoading] = useState(true);
 
   // Calculate node size
-  const getNodeSize = useCallback((node: GraphNode) => {
+  const getNodeSize = useCallback(() => {
     return 2;
   }, []);
 
@@ -102,7 +99,7 @@ export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGra
     if (!Number.isFinite(node.x) || !Number.isFinite(node.y)) return;
 
     const color = getNodeColor(node);
-    const r = getNodeSize(node);
+    const r = getNodeSize();
 
     // Draw solid node core
     ctx.beginPath();
@@ -241,11 +238,11 @@ export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGra
                 let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
                 let validNodes = 0;
                 data.nodes.forEach(n => {
-                  if (Number.isFinite(n.x) && Number.isFinite(n.y)) {
-                    minX = Math.min(minX, n.x);
-                    maxX = Math.max(maxX, n.x);
-                    minY = Math.min(minY, n.y);
-                    maxY = Math.max(maxY, n.y);
+                  if (typeof n.x === 'number' && typeof n.y === 'number') {
+                    minX = Math.min(minX, n.x as number);
+                    maxX = Math.max(maxX, n.x as number);
+                    minY = Math.min(minY, n.y as number);
+                    maxY = Math.max(maxY, n.y as number);
                     validNodes++;
                   }
                 });

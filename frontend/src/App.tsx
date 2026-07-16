@@ -131,9 +131,14 @@ function App() {
               const mergedNodes = state.graph.nodes.map((n: any) => {
                 const existing = existingNodeMap.get(n.id);
                 if (existing) {
-                  return { ...n, x: existing.x, y: existing.y, vx: existing.vx, vy: existing.vy, fx: existing.fx, fy: existing.fy };
+                  // Mutate existing object so D3 maintains the exact object reference
+                  // This prevents the physics engine from resetting and scrambling the graph
+                  existing.risk = n.risk;
+                  existing.is_red = n.is_red;
+                  existing.type = n.type;
+                  return existing; 
                 }
-                return n;
+                return { ...n };
               });
               return { nodes: mergedNodes, links: state.graph.links };
             });

@@ -3,11 +3,15 @@ import spaces
 import threading
 from src.api_server import (
     get_endpoints, get_events, get_users, get_policies, get_sessions, get_graph,
-    user_behavior, kill_session, security_policies
+    user_behavior, kill_session, security_policies, get_login_trends
 )
 from src.api_server import user_action as _user_action
 from src.api_server import toggle_policy as _toggle_policy
-from src.api_server import UserAction, PolicyToggle
+from src.api_server import ingest_cert_log as _ingest_cert_log
+from src.api_server import UserAction, PolicyToggle, CertEvent
+
+def ingest_cert_log_adapter(user_id, event_type, action, details):
+    return _ingest_cert_log(CertEvent(user_id=user_id, event_type=event_type, action=action, details=details))
 
 def user_action_adapter(user_id, action, reason):
     return _user_action(user_id, UserAction(action=action, reason=reason))
@@ -41,6 +45,7 @@ with gr.Blocks() as demo:
     gr.Button("policies").click(get_policies, outputs=[dummy_out], api_name="get_policies")
     gr.Button("sessions").click(get_sessions, outputs=[dummy_out], api_name="get_sessions")
     gr.Button("graph").click(get_graph, outputs=[dummy_out], api_name="get_graph")
+    gr.Button("login_trends").click(get_login_trends, outputs=[dummy_out], api_name="get_login_trends")
     
     # Endpoints with args
     uid_input = gr.Textbox(visible=False)
@@ -63,5 +68,12 @@ with gr.Blocks() as demo:
     scope_input = gr.Textbox(visible=False)
     enf_input = gr.Textbox(visible=False)
     gr.Button("add_policy").click(add_policy_adapter, inputs=[name_input, cat_input, scope_input, enf_input], outputs=[dummy_out], api_name="add_policy")
+
+    cert_uid = gr.Textbox(visible=False)
+    cert_type = gr.Textbox(visible=False)
+    cert_act = gr.Textbox(visible=False)
+    cert_det = gr.Textbox(visible=False)
+    gr.Button("cert_log").click(ingest_cert_log_adapter, inputs=[cert_uid, cert_type, cert_act, cert_det], outputs=[dummy_out], api_name="cert_log")
+
 
 demo.launch()

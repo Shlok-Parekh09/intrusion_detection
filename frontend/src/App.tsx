@@ -15,18 +15,24 @@ import './index.css';
 import { StatCard, Button, Table, Skeleton, Breadcrumbs, ErrorBoundary, NotificationBell, UserMenu, useCommandPalette, ForceGraphEnhanced } from './components';
 import { useToast, ToastContainer } from './components/Toast';
 
-const API = 'https://shlok0829-vortex-siem-backend.hf.space';
+import { Client } from "@gradio/client";
+
+
+let gradioClient: any = null;
+const getClient = async () => {
+  if (!gradioClient) {
+    gradioClient = await Client.connect("Shlok0829/vortex-siem-backend");
+  }
+  return gradioClient;
+};
 
 const gradioFetch = async (endpoint: string, args: any[] = []) => {
   try {
-    const res = await fetch(`${API}/run/${endpoint}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data: args })
-    });
-    const d = await res.json();
-    return d.data ? d.data[0] : null;
-  } catch {
+    const client = await getClient();
+    const result = await client.predict(`/${endpoint}`, args);
+    return result.data ? result.data[0] : null;
+  } catch (err) {
+    console.error(`Gradio fetch failed for ${endpoint}:`, err);
     return null;
   }
 };

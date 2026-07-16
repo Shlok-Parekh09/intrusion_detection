@@ -5,7 +5,7 @@ import {
 } from 'recharts';
 import {
   LayoutDashboard, Shield, Users, Monitor, Clock, FileText, Activity,
-  AlertTriangle, ShieldCheck, ShieldAlert, Cpu, Network, Lock, Unlock,
+  AlertTriangle, ShieldAlert, Cpu, Network, Lock, Unlock,
   ChevronUp, ChevronDown, Bell, TrendingUp, Eye, Search,
   Trash2, X, ChevronRight, ToggleLeft, ToggleRight, Plus, Circle
 } from 'lucide-react';

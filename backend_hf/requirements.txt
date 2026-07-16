@@ -1,8 +1,8 @@
-fastapi==0.115.0
-uvicorn==0.30.6
-pydantic==2.8.2
-gradio==4.40.0
-spaces
-pandas==2.2.2
-networkx==3.3
-cryptography==43.0.0
+fastapi
+uvicorn[standard]
+pydantic
+gradio
+
+pandas
+networkx
+cryptography

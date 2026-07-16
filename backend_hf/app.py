@@ -7,5 +7,5 @@ from src.api_server import app
 def dummy_gpu():
     pass
 
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=7860)
+# Run unconditionally so the HF importer gets blocked and FastAPI serves on 7860!
+uvicorn.run(app, host="0.0.0.0", port=7860)

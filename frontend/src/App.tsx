@@ -64,14 +64,44 @@ function riskLabel(r: number) { return r >= 0.8 ? 'Critical' : r >= 0.5 ? 'High'
 function riskBadge(r: number) { return r >= 0.8 ? 'badge-danger' : r >= 0.5 ? 'badge-warning' : r >= 0.3 ? 'badge-info' : 'badge-success'; }
 function statusBadge(s: string) { return s === 'active' ? 'badge-success' : s === 'locked' ? 'badge-danger' : s === 'under_investigation' ? 'badge-warning' : s === 'revoked' ? 'badge-danger' : 'badge-neutral'; }
 
+const MOCK_INITIAL_STATE = {
+  endpoints: [
+    { id: 'ep-001', hostname: 'DESKTOP-DEV1', status: 'SECURE', last_seen: Date.now() / 1000 - 5 },
+    { id: 'ep-002', hostname: 'DESKTOP-HR2', status: 'SECURE', last_seen: Date.now() / 1000 - 10 }
+  ],
+  events: [
+    { time: Date.now() / 1000 - 10, category: 'system', severity: 'INFO', message: 'System startup initiated' }
+  ],
+  users: [
+    { id: 'admin_sys', role: 'System Admin', department: 'IT', risk_score: 0.1, files_accessed_today: 12, login_count_today: 1 },
+    { id: 'dev_ops1', role: 'DevOps Engineer', department: 'Engineering', risk_score: 0.15, files_accessed_today: 45, login_count_today: 2 }
+  ],
+  policies: [
+    { id: 'pol-001', name: 'USB Mass Storage Block', enabled: true, scope: 'Global', enforced_count: 0 },
+    { id: 'pol-002', name: 'After-hours Login Restriction', enabled: false, scope: 'Global', enforced_count: 0 }
+  ],
+  sessions: [
+    { id: 'sess-001', agent_id: 'ep-001', status: 'active', protocol: 'QPC-AES-256', duration_seconds: 300, idle_seconds: 5 }
+  ],
+  graphData: {
+    nodes: [
+      { id: 'admin_sys', label: 'admin_sys', type: 'user', risk: 0.1 },
+      { id: 'sys_config.json', label: 'sys_config.json', type: 'file', risk: 0 }
+    ],
+    links: [
+      { source: 'admin_sys', target: 'sys_config.json' }
+    ]
+  }
+};
+
 function App() {
   const [page, setPage] = useState<NavPage>('dashboard');
-  const [endpoints, setEndpoints] = useState<Endpoint[]>([]);
-  const [events, setEvents] = useState<Event[]>([]);
-  const [users, setUsers] = useState<ManagedUser[]>([]);
-  const [policies, setPolicies] = useState<Policy[]>([]);
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [graphData, setGraphData] = useState({ nodes: [] as any[], links: [] as any[] });
+  const [endpoints, setEndpoints] = useState<any[]>(MOCK_INITIAL_STATE.endpoints);
+  const [events, setEvents] = useState<any[]>(MOCK_INITIAL_STATE.events);
+  const [users, setUsers] = useState<any[]>(MOCK_INITIAL_STATE.users);
+  const [policies, setPolicies] = useState<any[]>(MOCK_INITIAL_STATE.policies);
+  const [sessions, setSessions] = useState<any[]>(MOCK_INITIAL_STATE.sessions);
+  const [graphData, setGraphData] = useState<any>(MOCK_INITIAL_STATE.graphData);
   const [loginTrends, setLoginTrends] = useState<any[]>([]);
   const [clock, setClock] = useState(new Date());
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -123,9 +153,9 @@ function App() {
           setLoginTrends(state.trends);
           
           if (state.graph && state.graph.nodes) {
-            setGraphData(prev => {
+            setGraphData((prev: any) => {
               const existingNodeMap = new Map<string, any>();
-              for (const n of prev.nodes) {
+              for (const n of (prev?.nodes || [])) {
                 existingNodeMap.set(n.id, n);
               }
               const mergedNodes = state.graph.nodes.map((n: any) => {

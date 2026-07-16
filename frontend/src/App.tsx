@@ -17,6 +17,20 @@ import { useToast, ToastContainer } from './components/Toast';
 
 const API = 'https://shlok0829-vortex-siem-backend.hf.space';
 
+const gradioFetch = async (endpoint: string, args: any[] = []) => {
+  try {
+    const res = await fetch(`${API}/run/${endpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: args })
+    });
+    const d = await res.json();
+    return d.data ? d.data[0] : null;
+  } catch {
+    return null;
+  }
+};
+
 // ═══ Types ═══
 interface Endpoint { agent_id: string; timestamp: number; cpu: number; ram: number; net_conns: number; risk_score: number; status: string; last_seen: number; }
 interface Event { time: number; agent_id: string; message: string; severity: string; category?: string; }
@@ -83,12 +97,12 @@ function App() {
 
   // Fetch live data
   useEffect(() => {
-    const tick = () => {
-      fetch(`${API}/api/v1/endpoints`).then(r => r.json()).then(d => { if (Array.isArray(d)) setEndpoints(d); }).catch(() => {});
-      fetch(`${API}/api/v1/events?limit=50`).then(r => r.json()).then(d => { if (Array.isArray(d)) setEvents(d); }).catch(() => {});
-      fetch(`${API}/api/v1/users`).then(r => r.json()).then(d => { if (Array.isArray(d)) setUsers(d); }).catch(() => {});
-      fetch(`${API}/api/v1/policies`).then(r => r.json()).then(d => { if (Array.isArray(d)) setPolicies(d); }).catch(() => {});
-      fetch(`${API}/api/v1/sessions`).then(r => r.json()).then(d => { if (Array.isArray(d)) setSessions(d); }).catch(() => {});
+    const tick = async () => {
+      gradioFetch('get_endpoints').then(d => { if (Array.isArray(d)) setEndpoints(d); });
+      gradioFetch('get_events').then(d => { if (Array.isArray(d)) setEvents(d); });
+      gradioFetch('get_users').then(d => { if (Array.isArray(d)) setUsers(d); });
+      gradioFetch('get_policies').then(d => { if (Array.isArray(d)) setPolicies(d); });
+      gradioFetch('get_sessions').then(d => { if (Array.isArray(d)) setSessions(d); });
     };
     tick();
     const iv = setInterval(tick, 3000);
@@ -96,27 +110,27 @@ function App() {
   }, []);
 
   // Graph once
-  useEffect(() => { fetch(`${API}/api/graph`).then(r => r.json()).then(d => { if (d.nodes) setGraphData(d); }).catch(() => {}); }, []);
+  useEffect(() => { gradioFetch('get_graph').then(d => { if (d?.nodes) setGraphData(d); }); }, []);
 
   // API actions
   const userAction = async (uid: string, action: string, reason?: string) => {
-    await fetch(`${API}/api/v1/users/${uid}/action`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, reason }) });
-    fetch(`${API}/api/v1/users`).then(r => r.json()).then(d => { if (Array.isArray(d)) setUsers(d); });
-    fetch(`${API}/api/v1/events?limit=50`).then(r => r.json()).then(d => { if (Array.isArray(d)) setEvents(d); });
+    await gradioFetch('user_action', [uid, action, reason || '']);
+    gradioFetch('get_users').then(d => { if (Array.isArray(d)) setUsers(d); });
+    gradioFetch('get_events').then(d => { if (Array.isArray(d)) setEvents(d); });
   };
 
   const togglePolicy = async (pid: string, enabled: boolean) => {
-    await fetch(`${API}/api/v1/policies/${pid}/toggle`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled }) });
+    await gradioFetch('toggle_policy', [pid, enabled]);
     // toast.info(`Policy ${enabled ? 'enabled' : 'disabled'}`);
-    fetch(`${API}/api/v1/policies`).then(r => r.json()).then(d => { if (Array.isArray(d)) setPolicies(d); });
-    fetch(`${API}/api/v1/events?limit=50`).then(r => r.json()).then(d => { if (Array.isArray(d)) setEvents(d); });
+    gradioFetch('get_policies').then(d => { if (Array.isArray(d)) setPolicies(d); });
+    gradioFetch('get_events').then(d => { if (Array.isArray(d)) setEvents(d); });
   };
 
   const killSession = async (agentId: string) => {
-    await fetch(`${API}/api/v1/sessions/${agentId}/kill`, { method: 'POST' });
+    await gradioFetch('kill_session', [agentId]);
     // toast.warning(`Session ${agentId} terminated`);
-    fetch(`${API}/api/v1/sessions`).then(r => r.json()).then(d => { if (Array.isArray(d)) setSessions(d); });
-    fetch(`${API}/api/v1/events?limit=50`).then(r => r.json()).then(d => { if (Array.isArray(d)) setEvents(d); });
+    gradioFetch('get_sessions').then(d => { if (Array.isArray(d)) setSessions(d); });
+    gradioFetch('get_events').then(d => { if (Array.isArray(d)) setEvents(d); });
   };
 
   const locked = endpoints.filter(e => e.status === 'LOCKED').length;
@@ -352,8 +366,8 @@ function PageUsers({ users }: { users: ManagedUser[]; userAction?: (uid: string,
   const loadBehavior = async (uid: string) => {
     setSelected(uid);
     try {
-      const r = await fetch(`${API}/api/v1/analytics/behavior/${uid}`);
-      setBehaviorData(await r.json());
+      const d = await gradioFetch('user_behavior', [uid]);
+      setBehaviorData(d);
     } catch { setBehaviorData(null); }
   };
 
@@ -464,8 +478,8 @@ function PagePolicies({ policies, togglePolicy }: { policies: Policy[]; togglePo
         <Button variant="primary" size="sm" onClick={() => {
           const name = prompt('Enter new policy name:');
           if (name) {
-            fetch('http://localhost:8000/api/v1/policies', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, category: 'General', scope: 'Global', enforcement: 'Alert' }) }).then(r=>r.json()).then(d=> {
-              if(d.policy) policies.push(d.policy);
+            gradioFetch('add_policy', [name, 'General', 'Global', 'Alert']).then(d => {
+              if(d && d.policy) policies.push(d.policy);
             });
           }
         }}><Plus size={14} /> Add Policy</Button>

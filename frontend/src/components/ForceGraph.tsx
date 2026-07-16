@@ -102,15 +102,13 @@ export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGra
     if (!Number.isFinite(node.x) || !Number.isFinite(node.y)) return;
 
     const color = getNodeColor(node);
-    const r = 2;
+    const r = getNodeSize(node);
 
     // Draw solid node core
     ctx.beginPath();
     ctx.arc(node.x, node.y, r, 0, 2 * Math.PI, false);
     ctx.fillStyle = color.fill;
     ctx.fill();
-
-    // Removed dark border ring based on user request
 
     // Draw label on zoom (reduced text size)
     if (globalScale > 0.8) {

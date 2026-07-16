@@ -32,62 +32,10 @@ active_endpoints = {}
 live_events = []
 
 # Managed users with behavioral analytics
-managed_users = {
-    "admin-shlok": {
-        "id": "admin-shlok", "name": "Shlok Parekh", "role": "SOC Administrator",
-        "group": "Admins", "department": "Security", "access_level": "Privileged",
-        "status": "active", "mfa": True, "risk_score": 0.12,
-        "login_count_today": 3, "failed_logins_today": 0,
-        "files_accessed_today": 12, "after_hours_activity": False,
-        "usb_attempts": 0, "last_login": time.time() - 1800,
-        "behavioral_baseline": {"avg_files": 15, "avg_logins": 4, "avg_hours": 8},
-    },
-    "analyst-01": {
-        "id": "analyst-01", "name": "Priya Sharma", "role": "Security Analyst",
-        "group": "Analysts", "department": "SOC", "access_level": "Standard",
-        "status": "active", "mfa": True, "risk_score": 0.25,
-        "login_count_today": 5, "failed_logins_today": 1,
-        "files_accessed_today": 45, "after_hours_activity": False,
-        "usb_attempts": 0, "last_login": time.time() - 600,
-        "behavioral_baseline": {"avg_files": 30, "avg_logins": 5, "avg_hours": 9},
-    },
-    "contractor-02": {
-        "id": "contractor-02", "name": "James Wilson", "role": "External Contractor",
-        "group": "Contractors", "department": "IT Services", "access_level": "Limited",
-        "status": "active", "mfa": False, "risk_score": 0.65,
-        "login_count_today": 8, "failed_logins_today": 3,
-        "files_accessed_today": 120, "after_hours_activity": True,
-        "usb_attempts": 2, "last_login": time.time() - 120,
-        "behavioral_baseline": {"avg_files": 20, "avg_logins": 3, "avg_hours": 8},
-    },
-    "vendor-03": {
-        "id": "vendor-03", "name": "Chen Wei", "role": "Vendor Access",
-        "group": "Vendors", "department": "External", "access_level": "Restricted",
-        "status": "active", "mfa": True, "risk_score": 0.45,
-        "login_count_today": 2, "failed_logins_today": 0,
-        "files_accessed_today": 8, "after_hours_activity": False,
-        "usb_attempts": 0, "last_login": time.time() - 3600,
-        "behavioral_baseline": {"avg_files": 10, "avg_logins": 2, "avg_hours": 6},
-    },
-    "dba-04": {
-        "id": "dba-04", "name": "Arun Patel", "role": "Database Administrator",
-        "group": "Admins", "department": "Database", "access_level": "Privileged",
-        "status": "active", "mfa": True, "risk_score": 0.82,
-        "login_count_today": 12, "failed_logins_today": 4,
-        "files_accessed_today": 250, "after_hours_activity": True,
-        "usb_attempts": 1, "last_login": time.time() - 60,
-        "behavioral_baseline": {"avg_files": 40, "avg_logins": 6, "avg_hours": 9},
-    },
-    "intern-05": {
-        "id": "intern-05", "name": "Sara Ahmed", "role": "Intern",
-        "group": "Interns", "department": "Research", "access_level": "Minimal",
-        "status": "active", "mfa": False, "risk_score": 0.35,
-        "login_count_today": 4, "failed_logins_today": 2,
-        "files_accessed_today": 55, "after_hours_activity": True,
-        "usb_attempts": 0, "last_login": time.time() - 900,
-        "behavioral_baseline": {"avg_files": 10, "avg_logins": 2, "avg_hours": 6},
-    },
-}
+managed_users = {}
+
+
+
 
 # Security policies
 security_policies = [
@@ -135,13 +83,49 @@ def qpc_decrypt(encrypted_payload_b64: str) -> dict:
         return {}
 
 def load_dataset():
-    features = pd.read_csv(os.path.join(DATA_DIR, 'merged_features.csv'))
-    scores = pd.read_csv(os.path.join(DATA_DIR, 'anomaly_scores.csv'))
-    file_access = pd.read_csv(os.path.join(DATA_DIR, 'file_access.csv'), parse_dates=['access_time'])
+    # Read directly from the newly uploaded Hugging Face dataset
+    base_url = "hf://datasets/Shlok0829/cmu-cert-insider-threat"
+    features = pd.read_csv(f"{base_url}/merged_features.csv")
+    scores = pd.read_csv(f"{base_url}/anomaly_scores.csv")
+    file_access = pd.read_csv(f"{base_url}/file_access.csv", parse_dates=['access_time'])
     df = pd.merge(features, scores, on='user')
     if 'is_red_team_x' in df.columns:
         df['is_red_team'] = df['is_red_team_x']
     return df, file_access
+
+# ═══════════════════════════════════════════════════════════════════
+# Initialize Data from Hugging Face
+# ═══════════════════════════════════════════════════════════════════
+try:
+    _df, _ = load_dataset()
+    for _, row in _df.iterrows():
+        uid = str(row['user'])
+        is_red = bool(row.get('is_red_team', 0))
+        managed_users[uid] = {
+            "id": uid, "name": uid, "role": "Employee" if not is_red else "Insider Threat",
+            "group": "Staff", "department": "Operations", "access_level": "Standard",
+            "status": "active", "mfa": True, "risk_score": 0.0,
+            "login_count_today": int(row.get('login_count', 2)), 
+            "failed_logins_today": 0,
+            "files_accessed_today": int(row.get('file_count', 10)), 
+            "after_hours_activity": bool(row.get('after_hours', 0)),
+            "usb_attempts": 1 if is_red else 0, 
+            "last_login": time.time() - random.randint(100, 3600),
+            "behavioral_baseline": {"avg_files": 15, "avg_logins": 2, "avg_hours": 8},
+        }
+        active_endpoints[f"ep-{uid}"] = {
+            "agent_id": f"ep-{uid}",
+            "timestamp": time.time(),
+            "cpu": random.randint(10, 80),
+            "ram": random.randint(20, 90),
+            "net_conns": random.randint(5, 50),
+            "risk_score": 0.0,
+            "status": "SECURE",
+            "last_seen": time.time() - random.randint(0, 20)
+        }
+    print(f"Successfully loaded {len(managed_users)} users from Hugging Face.")
+except Exception as e:
+    print(f"Failed to initialize dataset: {e}")
 
 def _compute_behavioral_risk(user: dict) -> float:
     """AI-driven behavioral risk scoring."""
@@ -507,14 +491,10 @@ def get_graph():
         G = nx.Graph()
         for _, row in file_access.iterrows():
             G.add_edge(row['user'], row['file'], type='access')
-        high_risk_nodes = {n for n, v in attrs.items() if v['high_risk']}
-        connected_nodes = set()
-        for node in high_risk_nodes:
-            connected_nodes.add(node)
-            connected_nodes.update(list(G.neighbors(node))[:3])
-        subG = G.subgraph(connected_nodes)
+        
+        # Return all nodes instead of filtering
         nodes = []
-        for n in subG.nodes():
+        for n in G.nodes():
             n_type = "user" if n in attrs else "file"
             risk = attrs[n]['anomaly'] if n in attrs else 0
             is_red = bool(attrs[n]['red_team']) if n in attrs else False
@@ -522,7 +502,7 @@ def get_graph():
                 "id": str(n), "label": str(n), "type": n_type,
                 "risk": risk, "is_red": is_red
             })
-        edges = [{"source": str(u), "target": str(v)} for u, v in subG.edges()]
+        edges = [{"source": str(u), "target": str(v)} for u, v in G.edges()]
         return {"nodes": nodes, "links": edges}
     except Exception as e:
         return {"error": str(e)}

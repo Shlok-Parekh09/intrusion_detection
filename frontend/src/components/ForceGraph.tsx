@@ -3,7 +3,6 @@ import ForceGraph2D from 'react-force-graph-2d';
 import { ZoomIn, ZoomOut, RefreshCcw } from 'lucide-react';
 import { Button } from './Button';
 import { Badge } from './Badge';
-import { Skeleton } from './Skeleton';
 import { EmptyState } from './EmptyState';
 import { Tooltip } from './Tooltip';
 import './ForceGraph.css';

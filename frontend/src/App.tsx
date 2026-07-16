@@ -21,7 +21,9 @@ import { Client } from "@gradio/client";
 let gradioClient: any = null;
 const getClient = async () => {
   if (!gradioClient) {
-    gradioClient = await Client.connect("https://shlok0829-vortex-siem-backend.hf.space/");
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const backendUrl = import.meta.env.VITE_BACKEND_URL || (isLocal ? "http://127.0.0.1:8000/" : "https://shlok0829-vortex-siem-backend.hf.space/");
+    gradioClient = await Client.connect(backendUrl);
   }
   return gradioClient;
 };

@@ -155,8 +155,9 @@ try:
     # Pre-select exactly 30 users to be online "early birds" to simulate morning login organically
     initial_uids = random.sample(list(managed_users.keys()), min(30, len(managed_users)))
     for uid in initial_uids:
-        active_endpoints[f"ep-{uid}"] = {
-            "agent_id": f"ep-{uid}",
+        ep_id = f"ep-{uid}"
+        active_endpoints[ep_id] = {
+            "agent_id": ep_id,
             "timestamp": time.time(),
             "cpu": random.randint(10, 80),
             "ram": random.randint(20, 90),
@@ -165,6 +166,23 @@ try:
             "status": "SECURE",
             "last_seen": time.time() - random.randint(0, 20)
         }
+        active_sessions[ep_id] = {
+            "id": f"sess-{len(active_sessions)+1:04d}",
+            "agent_id": ep_id,
+            "started": time.time() - random.randint(60, 3600),
+            "last_activity": time.time() - random.randint(0, 60),
+            "status": "active",
+            "protocol": "QPC-AES-256",
+            "bytes_transferred": random.randint(1024, 1024000),
+        }
+        live_events.append({
+            "time": time.time() - random.randint(60, 3600),
+            "agent_id": ep_id,
+            "message": f"Successful Logon by {uid}",
+            "severity": "INFO",
+            "category": "system",
+        })
+        managed_users[uid]["login_count_today"] += 1
         
     print(f"Successfully loaded {len(managed_users)} users from Hugging Face. Pre-started {len(active_endpoints)} endpoints.")
 except Exception as e:

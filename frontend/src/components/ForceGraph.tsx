@@ -110,12 +110,7 @@ export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGra
     ctx.fillStyle = color.fill;
     ctx.fill();
 
-    // Draw dark border ring
-    ctx.beginPath();
-    ctx.arc(node.x, node.y, r, 0, 2 * Math.PI, false);
-    ctx.strokeStyle = color.stroke;
-    ctx.lineWidth = 0.5 / globalScale;
-    ctx.stroke();
+    // Removed dark border ring based on user request
 
     // Draw label on zoom (reduced text size)
     if (globalScale > 0.8) {
@@ -244,9 +239,22 @@ export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGra
           onBackgroundClick={handleBackgroundClick}
           onEngineStop={() => {
             if (isLoading) {
-              if (fgRef.current) {
-                fgRef.current.centerAt(0, 0, 0);
-                fgRef.current.zoom(1.2, 0);
+              if (fgRef.current && data.nodes.length > 0) {
+                let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+                data.nodes.forEach(n => {
+                  if (n.x !== undefined && n.y !== undefined) {
+                    minX = Math.min(minX, n.x);
+                    maxX = Math.max(maxX, n.x);
+                    minY = Math.min(minY, n.y);
+                    maxY = Math.max(maxY, n.y);
+                  }
+                });
+                if (minX !== Infinity) {
+                  const cx = (minX + maxX) / 2;
+                  const cy = (minY + maxY) / 2;
+                  fgRef.current.centerAt(cx, cy, 0);
+                  fgRef.current.zoom(0.8, 0);
+                }
               }
               setIsLoading(false);
             }

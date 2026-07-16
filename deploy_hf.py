@@ -5,7 +5,7 @@ username = api.whoami()["name"]
 repo_id = f"{username}/vortex-siem-backend"
 
 print(f"Creating space {repo_id}...")
-api.create_repo(repo_id=repo_id, repo_type="space", space_sdk="docker", exist_ok=True)
+api.create_repo(repo_id=repo_id, repo_type="space", space_sdk="gradio", exist_ok=True)
 
 print("Uploading files to space...")
 api.upload_folder(

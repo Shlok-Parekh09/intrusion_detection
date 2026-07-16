@@ -1,5 +1,6 @@
 fastapi
 uvicorn[standard]
+gradio
 pandas
 networkx
 cryptography

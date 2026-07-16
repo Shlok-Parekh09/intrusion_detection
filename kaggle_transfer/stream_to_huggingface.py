@@ -21,6 +21,7 @@ from huggingface_hub import HfApi, create_repo
 # Configuration
 # ---------------------------------------------------------------------------
 # Try Kaggle Secrets first, then environment variable
+# Try Kaggle Secrets first, then environment variable
 try:
     from kaggle_secrets import UserSecretsClient
     HF_TOKEN = UserSecretsClient().get_secret("HF_TOKEN")

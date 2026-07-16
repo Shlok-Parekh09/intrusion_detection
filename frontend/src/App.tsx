@@ -15,7 +15,7 @@ import './index.css';
 import { StatCard, Button, Table, Skeleton, Breadcrumbs, ErrorBoundary, NotificationBell, UserMenu, useCommandPalette, ForceGraphEnhanced } from './components';
 import { useToast, ToastContainer } from './components/Toast';
 
-const API = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+const API = import.meta.env.PROD ? 'https://shlok0829-vortex-siem-backend.hf.space' : 'http://127.0.0.1:8000';
 
 // ═══ Types ═══
 interface Endpoint { agent_id: string; timestamp: number; cpu: number; ram: number; net_conns: number; risk_score: number; status: string; last_seen: number; }

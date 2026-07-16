@@ -3,6 +3,6 @@ title: VORTEX SIEM Backend
 emoji: 🛡️
 colorFrom: blue
 colorTo: purple
-sdk: docker
+sdk: gradio
 pinned: false
 ---

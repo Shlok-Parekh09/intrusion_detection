@@ -118,6 +118,7 @@ def load_dataset():
 
 global_df = None
 live_graph_edges = []
+login_trends_by_hour = {str(i).zfill(2): {"successful": 0, "failed": 0} for i in range(24)}
 
 try:
     global_df, initial_file_access = load_dataset()
@@ -267,20 +268,35 @@ def ingest_cert_log(event: CertEvent):
     if event.event_type == "logon":
         user["login_count_today"] += 1
         user["last_login"] = time.time()
+        
+        # Track for the login trends chart based on real time
+        current_hour = str(time.localtime().tm_hour).zfill(2)
+        
         if "fail" in event.action.lower():
             user["failed_logins_today"] += 1
+            login_trends_by_hour[current_hour]["failed"] += 1
+            _add_event(f"ep-{uid}", f"Failed Logon attempt by {uid}", "WARNING", "Authentication")
+        else:
+            login_trends_by_hour[current_hour]["successful"] += 1
+            _add_event(f"ep-{uid}", f"Successful Logon by {uid}", "INFO", "Authentication")
             
     elif event.event_type == "file":
         user["files_accessed_today"] += 1
         # Add to graph
         file_name = event.details or f"file_{random.randint(1,1000)}.txt"
         live_graph_edges.append((uid, file_name))
-        # Keep graph manageable
-        if len(live_graph_edges) > 5000:
+        
+        # Log a small percentage of normal file accesses to the live feed so it looks busy but readable
+        if random.random() < 0.05:
+            _add_event(f"ep-{uid}", f"File Accessed: {file_name}", "INFO", "File System")
+            
+        # Keep graph manageable (max 100 edges to prevent frontend D3 physics explosion)
+        if len(live_graph_edges) > 100:
             live_graph_edges.pop(0)
             
     elif event.event_type == "email":
         user["email_count_today"] += 1
+        _add_event(f"ep-{uid}", f"Email sent by {uid} to {event.details}", "INFO", "Network")
         
     elif event.event_type == "usb":
         if event.action.lower() == "connect":
@@ -327,6 +343,21 @@ def get_events(category: Optional[str] = None, severity: Optional[str] = None, l
     if severity:
         filtered = [e for e in filtered if e["severity"] == severity]
     return sorted(filtered, key=lambda x: x["time"], reverse=True)[:limit]
+
+@app.get("/api/v1/trends/logins")
+def get_login_trends():
+    trends = []
+    # Return data from the last 8 hours
+    current_hour = time.localtime().tm_hour
+    for i in range(7, -1, -1):
+        h = (current_hour - i) % 24
+        h_str = str(h).zfill(2)
+        trends.append({
+            "time": f"{h_str}:00",
+            "successful": login_trends_by_hour[h_str]["successful"],
+            "failed": login_trends_by_hour[h_str]["failed"]
+        })
+    return trends
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -668,10 +699,10 @@ def autonomous_telemetry_simulator():
     total_logs = len(initial_file_access) if initial_file_access is not None else 0
     
     while True:
-        time.sleep(1.0) # Tick every 1 second
+        time.sleep(0.1) # Tick every 0.1 second (blazing fast)
         
-        # Play back up to 5 real file access logs per tick to create a real-time environment
-        for _ in range(5):
+        # Play back up to 25 real file access logs per tick to create a real-time environment
+        for _ in range(25):
             if log_index >= total_logs: 
                 log_index = 0 # loop dataset if we reach the end
                 

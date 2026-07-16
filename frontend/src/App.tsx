@@ -21,7 +21,7 @@ import { Client } from "@gradio/client";
 let gradioClient: any = null;
 const getClient = async () => {
   if (!gradioClient) {
-    gradioClient = await Client.connect("Shlok0829/vortex-siem-backend");
+    gradioClient = await Client.connect("https://shlok0829-vortex-siem-backend.hf.space/");
   }
   return gradioClient;
 };
@@ -70,8 +70,10 @@ function App() {
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [graphData, setGraphData] = useState({ nodes: [] as any[], links: [] as any[] });
+  const [loginTrends, setLoginTrends] = useState<any[]>([]);
   const [clock, setClock] = useState(new Date());
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const tickCount = useRef(0);
 
   // Toast hook
   const { toasts, removeToast } = useToast();
@@ -104,15 +106,21 @@ function App() {
   // Fetch live data
   useEffect(() => {
     const tick = async () => {
+      tickCount.current += 1;
       gradioFetch('get_endpoints').then(d => { if (Array.isArray(d)) setEndpoints(d); });
       gradioFetch('get_events').then(d => { if (Array.isArray(d)) setEvents(d); });
       gradioFetch('get_users').then(d => { if (Array.isArray(d)) setUsers(d); });
       gradioFetch('get_policies').then(d => { if (Array.isArray(d)) setPolicies(d); });
       gradioFetch('get_sessions').then(d => { if (Array.isArray(d)) setSessions(d); });
-      gradioFetch('get_graph').then(d => { if (d?.nodes) setGraphData(d); });
+      gradioFetch('get_login_trends').then(d => { if (Array.isArray(d)) setLoginTrends(d); });
+      
+      // Only update graph every 6 ticks (3 seconds) to prevent physics engine from constantly restarting
+      if (tickCount.current % 6 === 0) {
+        gradioFetch('get_graph').then(d => { if (d?.nodes) setGraphData(d); });
+      }
     };
     tick();
-    const iv = setInterval(tick, 3000);
+    const iv = setInterval(tick, 500);
     return () => clearInterval(iv);
   }, []);
 
@@ -220,7 +228,7 @@ function App() {
 
         <div className="dashboard-content">
           <ErrorBoundary name="PageContent">
-            {page === 'dashboard' && <PageDashboard endpoints={endpoints} events={events} graphData={graphData} users={users} locked={locked} criticals={criticals} />}
+            {page === 'dashboard' && <PageDashboard endpoints={endpoints} events={events} graphData={graphData} users={users} locked={locked} criticals={criticals} loginTrends={loginTrends} />}
             {page === 'users' && <PageUsers users={users} userAction={userAction} />}
             {page === 'policies' && <PagePolicies policies={policies} togglePolicy={togglePolicy} />}
             {page === 'devices' && <PageDevices endpoints={endpoints} />}
@@ -242,13 +250,9 @@ function App() {
 // ═══════════════════════════════════════════════════════════════════
 // DASHBOARD
 // ═══════════════════════════════════════════════════════════════════
-function PageDashboard({ endpoints, events, graphData, users, locked, criticals }: any) {
-  const trends = [];
+function PageDashboard({ endpoints, events, graphData, users, locked, criticals, loginTrends }: any) {
+  const trends = loginTrends && loginTrends.length > 0 ? loginTrends : [];
   const now = new Date();
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(now); d.setDate(d.getDate() - i);
-    trends.push({ date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), successful: 15 + Math.floor(Math.random() * 25), failed: 1 + Math.floor(Math.random() * 6) });
-  }
   const riskDist = [
     { name: 'Low', value: users.filter((u: any) => u.risk_score < 0.3).length, color: '#22c55e' },
     { name: 'Medium', value: users.filter((u: any) => u.risk_score >= 0.3 && u.risk_score < 0.5).length, color: '#3b82f6' },
@@ -268,12 +272,12 @@ function PageDashboard({ endpoints, events, graphData, users, locked, criticals 
     {/* Charts row */}
     <div className="grid-main">
       <div className="panel">
-        <div className="panel-header"><span className="panel-title"><Activity size={14} /> Login Trends</span><span className="panel-subtitle">7 days</span></div>
+        <div className="panel-header"><span className="panel-title"><Activity size={14} /> Login Trends</span><span className="panel-subtitle">Today (Live)</span></div>
         <div className="panel-body"><div className="chart-container">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={trends} barGap={1} barSize={16}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-              <XAxis dataKey="date" tick={{ fill: '#8892a4', fontSize: 10 }} axisLine={false} tickLine={false} />
+              <XAxis dataKey="time" tick={{ fill: '#8892a4', fontSize: 10 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: '#8892a4', fontSize: 10 }} axisLine={false} tickLine={false} width={30} />
               <Tooltip contentStyle={{ background: '#1a1f2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 11, color: '#e8eaed' }} />
               <Legend wrapperStyle={{ fontSize: 11 }} />

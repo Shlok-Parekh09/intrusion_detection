@@ -132,11 +132,14 @@ export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGra
     document.body.style.cursor = node ? 'pointer' : 'default';
   }, []);
 
-  // Update D3 physics to spread out nodes
+  // Update D3 physics to prevent nodes from exploding into a 'galaxy'
   useEffect(() => {
     if (fgRef.current) {
-      fgRef.current.d3Force('charge').strength(-150);
-      fgRef.current.d3Force('link').distance(40);
+      // Significantly reduce repulsion so nodes stay together
+      fgRef.current.d3Force('charge').strength(-30);
+      fgRef.current.d3Force('link').distance(20);
+      // Center force keeps them in view
+      fgRef.current.d3Force('center').strength(0.1);
     }
   }, []);
 

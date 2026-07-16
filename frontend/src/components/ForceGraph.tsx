@@ -64,19 +64,22 @@ export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGra
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Auto-center graph whenever node count changes
+  const hasFit = useRef(false);
+
+  // Auto-center ONCE when nodes first appear - never again (prevents zoom loop)
   useEffect(() => {
-    if (data.nodes.length > 0 && fgRef.current) {
-      // Small delay to let D3 finish layout before fitting
+    if (data.nodes.length > 0 && fgRef.current && !hasFit.current) {
+      hasFit.current = true;
+      // Delay so D3 warmup ticks finish before we fit
       setTimeout(() => {
-        fgRef.current?.zoomToFit(400, 60);
-      }, 300);
+        fgRef.current?.zoomToFit(600, 80);
+      }, 1200);
     }
   }, [data.nodes.length]);
 
   // Calculate node size - bigger so labels are readable
   const getNodeSize = useCallback(() => {
-    return 8;
+    return 6;
   }, []);
 
   // Get node color by user request

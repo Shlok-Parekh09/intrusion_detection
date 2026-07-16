@@ -455,7 +455,14 @@ def get_dashboard_state():
             "failed": login_trends_by_hour[h_str]["failed"]
         })
         
-    # 6. Graph
+    # 6. Graph — cap to top 60 highest-risk users to keep it readable
+    MAX_GRAPH_USERS = 60
+    # Sort users by risk so red-team/high-risk always appear
+    sorted_users = sorted(managed_users.items(),
+                          key=lambda kv: _compute_behavioral_risk(kv[1]),
+                          reverse=True)
+    top_user_ids = {uid for uid, _ in sorted_users[:MAX_GRAPH_USERS]}
+    
     graph_nodes = []
     graph_links = []
     unique_nodes = set()

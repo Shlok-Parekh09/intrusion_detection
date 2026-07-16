@@ -106,35 +106,11 @@ function App() {
     localStorage.setItem('sidebar-collapsed', JSON.stringify(sidebarCollapsed));
   }, [sidebarCollapsed]);
 
-  // Load the daily graph snapshot ONCE on startup — never poll it again
-  // This shows all user connections for the day as a beautiful static display
-  const graphLoaded = useRef(false);
-  useEffect(() => {
-    if (graphLoaded.current) return;
-    graphLoaded.current = true;
-
-    const loadGraph = async () => {
-      try {
-        // Retry up to 5 times in case backend is still booting
-        for (let attempt = 0; attempt < 5; attempt++) {
-          const state = await gradioFetch('get_dashboard_state');
-          if (state?.graph?.nodes?.length > 0) {
-            setGraphData({ nodes: state.graph.nodes, links: state.graph.links });
-            return;
-          }
-          await new Promise(r => setTimeout(r, 3000)); // Wait 3s between retries
-        }
-      } catch (err) {
-        console.error('Graph load failed:', err);
-      }
-    };
-    loadGraph();
-  }, []);
-
-  // Live polling — dashboard stats only, no graph (graph is a static daily snapshot)
+  // Fetch live data
   useEffect(() => {
     const tick = async () => {
       tickCount.current += 1;
+      
       try {
         const state = await gradioFetch('get_dashboard_state');
         if (state && typeof state === 'object' && 'endpoints' in state) {
@@ -145,15 +121,31 @@ function App() {
           setPolicies(state.policies);
           setSessions(state.sessions);
           setLoginTrends(state.trends);
-          // Graph intentionally NOT updated — it's a static daily snapshot
+          
+          if (state.graph && state.graph.nodes) {
+            setGraphData(prev => {
+              const existingNodeMap = new Map<string, any>();
+              for (const n of prev.nodes) {
+                existingNodeMap.set(n.id, n);
+              }
+              const mergedNodes = state.graph.nodes.map((n: any) => {
+                const existing = existingNodeMap.get(n.id);
+                if (existing) {
+                  return { ...n, x: existing.x, y: existing.y, vx: existing.vx, vy: existing.vy, fx: existing.fx, fy: existing.fy };
+                }
+                return n;
+              });
+              return { nodes: mergedNodes, links: state.graph.links };
+            });
+          }
         }
       } catch (err) {
-        console.error('Dashboard state fetch failed:', err);
+        console.error("Dashboard state fetch failed:", err);
       }
     };
     tick();
     
-    // Poll every 500ms — only dashboard stats, no graph churn
+    // Poll every 500ms
     const iv = setInterval(tick, 500);
     return () => clearInterval(iv);
   }, []);

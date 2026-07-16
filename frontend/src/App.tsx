@@ -114,8 +114,8 @@ function App() {
       gradioFetch('get_sessions').then(d => { if (Array.isArray(d)) setSessions(d); });
       gradioFetch('get_login_trends').then(d => { if (Array.isArray(d)) setLoginTrends(d); });
       
-      // Update graph every 2 ticks (1 second) to be more responsive without dying
-      if (tickCount.current % 2 === 0) {
+      // Update graph every 6 ticks (3 seconds) to allow the graph physics to slowly transition and settle
+      if (tickCount.current % 6 === 0) {
         gradioFetch('get_graph').then(d => { if (d?.nodes) setGraphData(d); });
       }
     };

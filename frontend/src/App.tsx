@@ -75,6 +75,7 @@ function App() {
   const [loginTrends, setLoginTrends] = useState<any[]>([]);
   const [clock, setClock] = useState(new Date());
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(true);
   const tickCount = useRef(0);
 
   // Toast hook
@@ -109,7 +110,13 @@ function App() {
   useEffect(() => {
     const tick = async () => {
       tickCount.current += 1;
-      gradioFetch('get_endpoints').then(d => { if (Array.isArray(d)) setEndpoints(d); });
+      // Mark as connected once we successfully get endpoints
+      gradioFetch('get_endpoints').then(d => { 
+        if (Array.isArray(d)) {
+          setEndpoints(d);
+          setIsConnecting(false);
+        }
+      });
       gradioFetch('get_events').then(d => { if (Array.isArray(d)) setEvents(d); });
       gradioFetch('get_users').then(d => { if (Array.isArray(d)) setUsers(d); });
       gradioFetch('get_policies').then(d => { if (Array.isArray(d)) setPolicies(d); });

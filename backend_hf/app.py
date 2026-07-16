@@ -3,7 +3,7 @@ import spaces
 import threading
 from src.api_server import (
     get_endpoints, get_events, get_users, get_policies, get_sessions, get_graph,
-    user_behavior, kill_session, security_policies, get_login_trends
+    user_behavior, kill_session, security_policies, get_login_trends, get_dashboard_state
 )
 from src.api_server import user_action as _user_action
 from src.api_server import toggle_policy as _toggle_policy
@@ -46,6 +46,7 @@ with gr.Blocks() as demo:
     gr.Button("sessions").click(get_sessions, outputs=[dummy_out], api_name="get_sessions")
     gr.Button("graph").click(get_graph, outputs=[dummy_out], api_name="get_graph")
     gr.Button("login_trends").click(get_login_trends, outputs=[dummy_out], api_name="get_login_trends")
+    gr.Button("dashboard_state").click(get_dashboard_state, outputs=[dummy_out], api_name="get_dashboard_state")
     
     # Endpoints with args
     uid_input = gr.Textbox(visible=False)

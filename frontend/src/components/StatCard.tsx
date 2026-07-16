@@ -54,7 +54,7 @@ export function StatCard({ icon, iconClass, label, value, sub, subClass, trend, 
     };
 
     requestAnimationFrame(animate);
-  }, [value]);
+  }, [value, displayValue]);
 
   const formatValue = (val: number) => {
     if (typeof value === 'string') return value;

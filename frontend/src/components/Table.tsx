@@ -41,7 +41,7 @@ export function Table<T>({
   const [currentPage, setCurrentPage] = useState(1);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
-  const parentRef = useRef<HTMLTableSectionElement>(null);
+  const parentRef = useRef<HTMLDivElement>(null);
 
   // Sort data
   const sortedData = useMemo(() => {
@@ -109,7 +109,7 @@ export function Table<T>({
 
   return (
     <div className={`table-container ${className}`}>
-      <div className="table-wrapper">
+      <div className="table-wrapper" ref={parentRef}>
         <table className="table">
           <thead className="table__header">
             <tr>

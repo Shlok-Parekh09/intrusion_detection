@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useMemo } from 'react';
+import { useRef, useState, useCallback, useMemo, useEffect } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
 import { ZoomIn, ZoomOut, RefreshCcw } from 'lucide-react';
 import { Button } from './Button';
@@ -47,26 +47,37 @@ const NODE_COLORS = {
   threat: { fill: '#ef4444', stroke: '#f87171', gradient: ['rgba(239, 68, 68, 0.9)', 'rgba(239, 68, 68, 0.15)'] },
 };
 
-const NODE_SIZE_MULTIPLIER = 2.5;
-const BASE_NODE_SIZE = 3;
+const NODE_SIZE_MULTIPLIER = 1.0;
+const BASE_NODE_SIZE = 1.0;
 
 export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGraphEnhancedProps) {
   const fgRef = useRef<any>(null);
   const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
   const [pinnedNode, setPinnedNode] = useState<GraphNode | null>(null);
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(0.4);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Calculate node size based on risk score or connections
+  // Calculate node size
   const getNodeSize = useCallback((node: GraphNode) => {
-    const metric = node.risk_score || node.connections || 1;
-    return BASE_NODE_SIZE + Math.min((metric || 0) * NODE_SIZE_MULTIPLIER, 8);
+    return 2;
   }, []);
 
-  // Get node color by type
+  // Get node color by user request
   const getNodeColor = useCallback((node: GraphNode) => {
-    const type = node.type || (node.is_red ? 'threat' : 'device');
-    return NODE_COLORS[type as keyof typeof NODE_COLORS] || NODE_COLORS.device;
+    // Files are yellow
+    const isFile = (node.id && node.id.includes('file')) || node.type === 'file';
+    if (isFile) {
+      return { fill: '#eab308', stroke: '#a16207' }; // yellow
+    }
+
+    // Malicious activity -> red
+    const isMalicious = node.is_red || (node.risk_score && node.risk_score > 0.5);
+    if (isMalicious) {
+      return { fill: '#ef4444', stroke: '#991b1b' }; // red
+    }
+
+    // Valid users / everything else -> blue
+    return { fill: '#3b82f6', stroke: '#1d4ed8' }; // blue
   }, []);
 
   // Highlight connected nodes on hover
@@ -86,44 +97,33 @@ export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGra
     return 0.4;
   }, [hoveredNode]);
 
-  // Node render with radial gradient effect
+  // Node render with clear circles
   const nodeCanvasObject = useCallback((node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
+    if (!Number.isFinite(node.x) || !Number.isFinite(node.y)) return;
+
     const color = getNodeColor(node);
-    const size = getNodeSize(node);
-    const r = size / globalScale;
+    const r = 2;
 
-    // Radial gradient for glowing effect
-    const gradient = ctx.createRadialGradient(node.x, node.y, 0, node.x, node.y, r);
-    gradient.addColorStop(0, color.gradient[0]);
-    gradient.addColorStop(0.6, color.gradient[1]);
-    gradient.addColorStop(1, 'transparent');
-
-    // Draw glow
+    // Draw solid node core
     ctx.beginPath();
-    ctx.arc(node.x, node.y, r * 1.5, 0, 2 * Math.PI, false);
-    ctx.fillStyle = gradient;
-    ctx.fill();
-
-    // Draw node core
-    ctx.beginPath();
-    ctx.arc(node.x, node.y, r * 0.7, 0, 2 * Math.PI, false);
+    ctx.arc(node.x, node.y, r, 0, 2 * Math.PI, false);
     ctx.fillStyle = color.fill;
     ctx.fill();
 
-    // Draw border ring
+    // Draw dark border ring
     ctx.beginPath();
-    ctx.arc(node.x, node.y, r * 0.7, 0, 2 * Math.PI, false);
+    ctx.arc(node.x, node.y, r, 0, 2 * Math.PI, false);
     ctx.strokeStyle = color.stroke;
-    ctx.lineWidth = 1.5 / globalScale;
+    ctx.lineWidth = 0.5 / globalScale;
     ctx.stroke();
 
-    // Draw label on zoom
-    if (globalScale > 1.2) {
-      ctx.font = `${Math.max(10, 12 / globalScale)}px Inter`;
+    // Draw label on zoom (reduced text size)
+    if (globalScale > 0.8) {
+      ctx.font = `${Math.max(4, 6 / globalScale)}px Inter`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
       ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-      ctx.fillText(node.label || node.id, node.x, node.y + r + 4 / globalScale);
+      ctx.fillText(node.label || node.id, node.x, node.y + r + 2 / globalScale);
     }
 
     // Highlight pinned node
@@ -140,6 +140,14 @@ export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGra
   const handleNodeHover = useCallback((node: GraphNode | null) => {
     setHoveredNode(node);
     document.body.style.cursor = node ? 'pointer' : 'default';
+  }, []);
+
+  // Update D3 physics to spread out nodes
+  useEffect(() => {
+    if (fgRef.current) {
+      fgRef.current.d3Force('charge').strength(-150);
+      fgRef.current.d3Force('link').distance(40);
+    }
   }, []);
 
   const handleNodeClick = useCallback((node: GraphNode) => {
@@ -220,10 +228,14 @@ export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGra
           backgroundColor="transparent"
           nodeRelSize={6}
           nodeCanvasObject={nodeCanvasObject}
-          nodeCanvasObjectMode={() => 'after'}
+          nodeCanvasObjectMode={() => 'replace'}
           linkColor={getLinkColor}
           linkWidth={getLinkWidth}
           linkDirectionalArrowLength={0}
+          linkDirectionalParticles={2}
+          linkDirectionalParticleSpeed={0.01}
+          linkDirectionalParticleWidth={1.5}
+          linkDirectionalParticleColor={() => "rgba(255,255,255,0.7)"}
           d3VelocityDecay={0.4}
           cooldownTicks={100}
           warmupTicks={50}
@@ -231,8 +243,13 @@ export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGra
           onNodeClick={handleNodeClick}
           onBackgroundClick={handleBackgroundClick}
           onEngineStop={() => {
-            fgRef.current?.zoomToFit(500, 30);
-            setIsLoading(false);
+            if (isLoading) {
+              if (fgRef.current) {
+                fgRef.current.centerAt(0, 0, 0);
+                fgRef.current.zoom(1.2, 0);
+              }
+              setIsLoading(false);
+            }
           }}
         />
 

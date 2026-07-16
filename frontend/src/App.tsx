@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Shield, Users, Monitor, Clock, FileText, Activity,
   AlertTriangle, ShieldCheck, ShieldAlert, Cpu, Network, Lock, Unlock,
   ChevronUp, ChevronDown, Bell, TrendingUp, Eye, Search,
-  Trash2, X, ChevronRight, ToggleLeft, ToggleRight
+  Trash2, X, ChevronRight, ToggleLeft, ToggleRight, Plus
 } from 'lucide-react';
 import './index.css';
 
@@ -15,7 +15,7 @@ import './index.css';
 import { StatCard, Button, Table, Skeleton, Breadcrumbs, ErrorBoundary, NotificationBell, UserMenu, useCommandPalette, ForceGraphEnhanced } from './components';
 import { useToast, ToastContainer } from './components/Toast';
 
-const API = 'http://127.0.0.1:8000';
+const API = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 
 // ═══ Types ═══
 interface Endpoint { agent_id: string; timestamp: number; cpu: number; ram: number; net_conns: number; risk_score: number; status: string; last_seen: number; }
@@ -362,7 +362,22 @@ function PageUsers({ users }: { users: ManagedUser[]; userAction?: (uid: string,
     { key: 'name', header: 'User', width: 200, render: (u: ManagedUser) => <div><div style={{ fontWeight: 600, fontSize: 13 }}>{u.name}</div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{u.id}</div></div> },
     { key: 'role', header: 'Role', width: 120 },
     { key: 'department', header: 'Dept', width: 100 },
-    { key: 'access_level', header: 'Access', width: 100, render: (u: ManagedUser) => <span className={`badge ${u.access_level === 'Privileged' ? 'badge-warning' : u.access_level === 'None' ? 'badge-danger' : 'badge-neutral'}`}>{u.access_level}</span> },
+    { key: 'access_level', header: 'Access', width: 100, render: (u: ManagedUser) => (
+      <select 
+        value={u.access_level} 
+        onChange={(e) => userAction(u.id, 'update_access', e.target.value)}
+        onClick={(e) => e.stopPropagation()}
+        className={`badge ${u.access_level === 'Privileged' ? 'badge-warning' : u.access_level === 'None' ? 'badge-danger' : 'badge-neutral'}`}
+        style={{ cursor: 'pointer', outline: 'none', appearance: 'none', border: 'none', WebkitAppearance: 'none' }}
+      >
+        <option value="Minimal">Minimal</option>
+        <option value="Standard">Standard</option>
+        <option value="Limited">Limited</option>
+        <option value="Privileged">Privileged</option>
+        <option value="Restricted">Restricted</option>
+        <option value="None">None</option>
+      </select>
+    ) },
     { key: 'status', header: 'Status', width: 120, render: (u: ManagedUser) => <span className={`badge ${statusBadge(u.status)}`}>{u.status}</span> },
     { key: 'mfa', header: 'MFA', width: 60, render: (u: ManagedUser) => u.mfa ? <span className="badge badge-success">On</span> : <span className="badge badge-danger">Off</span> },
     { key: 'files_accessed_today', header: 'Files', width: 60 },
@@ -385,7 +400,7 @@ function PageUsers({ users }: { users: ManagedUser[]; userAction?: (uid: string,
           columns={userColumns as any}
           emptyMessage="No users found"
           pageSize={15}
-          virtualScroll
+          virtualScroll={false}
           virtualScrollHeight={400}
           onRowClick={(u: ManagedUser) => loadBehavior(u.id)}
         />
@@ -438,11 +453,24 @@ function PagePolicies({ policies, togglePolicy }: { policies: Policy[]; togglePo
     { key: 'category', header: 'Category', width: 120, render: (p: Policy) => <span className="badge badge-neutral">{p.category}</span> },
     { key: 'scope', header: 'Scope', width: 150 },
     { key: 'enforcement', header: 'Enforcement', width: 120, render: (p: Policy) => <span className="badge badge-info">{p.enforcement}</span> },
-    { key: 'violations', header: 'Violations', width: 100, render: (p: Policy) => p.violations > 0 ? <span className="badge badge-danger">{p.violations}</span> : <span style={{ color: 'var(--text-muted)' }}>0</span> },
+    { key: 'violations', header: 'Violations', width: 100, render: (p: Policy) => p.violations > 0 ? <span className="badge badge-danger" style={{ width: 24, textAlign: 'center', display: 'inline-block' }}>{p.violations}</span> : <span className="badge badge-neutral" style={{ width: 24, textAlign: 'center', display: 'inline-block' }}>0</span> },
   ];
 
   return (<div className="panel" style={{ flex: 1 }}>
-    <div className="panel-header"><span className="panel-title"><Shield size={14} /> Security Policies</span><span className="panel-subtitle">{policies.filter(p => p.enabled).length}/{policies.length} active</span></div>
+    <div className="panel-header">
+      <span className="panel-title"><Shield size={14} /> Security Policies</span>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+        <span className="panel-subtitle">{policies.filter(p => p.enabled).length}/{policies.length} active</span>
+        <Button variant="primary" size="sm" onClick={() => {
+          const name = prompt('Enter new policy name:');
+          if (name) {
+            fetch('http://localhost:8000/api/v1/policies', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, category: 'General', scope: 'Global', enforcement: 'Alert' }) }).then(r=>r.json()).then(d=> {
+              if(d.policy) policies.push(d.policy);
+            });
+          }
+        }}><Plus size={14} /> Add Policy</Button>
+      </div>
+    </div>
     <div className="panel-body">
       <Table data={policies} columns={policyColumns as any} emptyMessage="No policies configured" pageSize={20} />
     </div>
@@ -467,7 +495,7 @@ function PageDevices({ endpoints }: { endpoints: Endpoint[] }) {
   return (<div className="panel" style={{ flex: 1 }}>
     <div className="panel-header"><span className="panel-title"><Monitor size={14} /> Device Registry</span><span className="panel-subtitle">{endpoints.length} connected</span></div>
     <div className="panel-body">
-      <Table data={endpoints} columns={deviceColumns as any} emptyMessage="No devices connected" pageSize={15} virtualScroll virtualScrollHeight={400} />
+      <Table data={endpoints} columns={deviceColumns as any} emptyMessage="No devices connected" pageSize={15} />
     </div>
   </div>);
 }
@@ -542,7 +570,7 @@ function PageAudit({ events }: { events: Event[] }) {
       </div>
     </div>
     <div className="panel-body">
-      <Table data={filtered} columns={auditColumns as any} emptyMessage="No matching events" pageSize={20} virtualScroll virtualScrollHeight={500} />
+      <Table data={filtered} columns={auditColumns as any} emptyMessage="No matching events" pageSize={20} />
     </div>
   </div>);
 }

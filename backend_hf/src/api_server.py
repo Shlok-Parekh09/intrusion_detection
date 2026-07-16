@@ -69,6 +69,12 @@ class PolicyToggle(BaseModel):
 class SessionAction(BaseModel):
     action: str  # kill, flag
 
+class CertEvent(BaseModel):
+    user_id: str
+    event_type: str  # 'logon', 'file', 'email', 'usb'
+    action: str
+    details: str
+
 
 def qpc_decrypt(encrypted_payload_b64: str) -> dict:
     try:
@@ -83,33 +89,51 @@ def qpc_decrypt(encrypted_payload_b64: str) -> dict:
         return {}
 
 def load_dataset():
-    # Read directly from the newly uploaded Hugging Face dataset
-    base_url = "hf://datasets/Shlok0829/cmu-cert-insider-threat"
-    features = pd.read_csv(f"{base_url}/merged_features.csv")
-    scores = pd.read_csv(f"{base_url}/anomaly_scores.csv")
-    file_access = pd.read_csv(f"{base_url}/file_access.csv", parse_dates=['access_time'])
+    # Use the pre-packaged local data files to bypass Hugging Face API downtimes
+    import os
+    
+    # Check if we are running in the backend_hf directory or root directory
+    base_dir = "data"
+    if not os.path.exists(base_dir) and os.path.exists("backend_hf/data"):
+        base_dir = "backend_hf/data"
+        
+    feat_path = os.path.join(base_dir, "merged_features.csv")
+    scores_path = os.path.join(base_dir, "anomaly_scores.csv")
+    file_path = os.path.join(base_dir, "file_access.csv")
+    
+    features = pd.read_csv(feat_path)
+    scores = pd.read_csv(scores_path)
+    file_access = pd.read_csv(file_path, parse_dates=['access_time'])
+    file_access = file_access.sort_values(by='access_time').reset_index(drop=True)
+    
     df = pd.merge(features, scores, on='user')
     if 'is_red_team_x' in df.columns:
         df['is_red_team'] = df['is_red_team_x']
+    return df, file_access
     return df, file_access
 
 # ═══════════════════════════════════════════════════════════════════
 # Initialize Data from Hugging Face
 # ═══════════════════════════════════════════════════════════════════
+
+global_df = None
+live_graph_edges = []
+
 try:
-    _df, _ = load_dataset()
-    for _, row in _df.iterrows():
+    global_df, initial_file_access = load_dataset()
+    for _, row in global_df.iterrows():
         uid = str(row['user'])
         is_red = bool(row.get('is_red_team', 0))
         managed_users[uid] = {
             "id": uid, "name": uid, "role": "Employee" if not is_red else "Insider Threat",
             "group": "Staff", "department": "Operations", "access_level": "Standard",
             "status": "active", "mfa": True, "risk_score": 0.0,
-            "login_count_today": int(row.get('login_count', 2)), 
+            "login_count_today": 0, # Start at 0 for live simulation
             "failed_logins_today": 0,
-            "files_accessed_today": int(row.get('file_count', 10)), 
-            "after_hours_activity": bool(row.get('after_hours', 0)),
-            "usb_attempts": 1 if is_red else 0, 
+            "files_accessed_today": 0, # Start at 0
+            "email_count_today": 0,
+            "after_hours_activity": False,
+            "usb_attempts": 0, 
             "last_login": time.time() - random.randint(100, 3600),
             "behavioral_baseline": {"avg_files": 15, "avg_logins": 2, "avg_hours": 8},
         }
@@ -123,9 +147,12 @@ try:
             "status": "SECURE",
             "last_seen": time.time() - random.randint(0, 20)
         }
+    # The graph will start empty and build dynamically as logs arrive!
+        
     print(f"Successfully loaded {len(managed_users)} users from Hugging Face.")
 except Exception as e:
     print(f"Failed to initialize dataset: {e}")
+
 
 def _compute_behavioral_risk(user: dict) -> float:
     """AI-driven behavioral risk scoring."""
@@ -228,6 +255,59 @@ def ingest_telemetry(payload: TelemetryPayload):
 
     return {"status": "success", "risk_score": risk_score, "rbac_action": agent_state["status"]}
 
+@app.post("/api/v1/telemetry/cert_log")
+def ingest_cert_log(event: CertEvent):
+    uid = event.user_id
+    if uid not in managed_users:
+        return {"status": "ignored", "reason": "unknown_user"}
+        
+    user = managed_users[uid]
+    
+    # Process event
+    if event.event_type == "logon":
+        user["login_count_today"] += 1
+        user["last_login"] = time.time()
+        if "fail" in event.action.lower():
+            user["failed_logins_today"] += 1
+            
+    elif event.event_type == "file":
+        user["files_accessed_today"] += 1
+        # Add to graph
+        file_name = event.details or f"file_{random.randint(1,1000)}.txt"
+        live_graph_edges.append((uid, file_name))
+        # Keep graph manageable
+        if len(live_graph_edges) > 5000:
+            live_graph_edges.pop(0)
+            
+    elif event.event_type == "email":
+        user["email_count_today"] += 1
+        
+    elif event.event_type == "usb":
+        if event.action.lower() == "connect":
+            user["usb_attempts"] += 1
+            _add_event(f"ep-{uid}", f"USB Drive Connected by {uid}", "WARNING", "Data Protection")
+
+    # Flag after-hours activity (assuming real-time streaming means current time is after hours for simulation)
+    # For now, we'll randomly flag off-hour activity if it's a red team user
+    if user["role"] == "Insider Threat" and random.random() < 0.05:
+        user["after_hours_activity"] = True
+        
+    # Bump endpoint last seen so it stays active
+    ep_id = f"ep-{uid}"
+    if ep_id in active_endpoints:
+        active_endpoints[ep_id]["last_seen"] = time.time()
+        active_endpoints[ep_id]["cpu"] = random.randint(10, 80)
+        active_endpoints[ep_id]["ram"] = random.randint(20, 90)
+        
+    # Re-evaluate risk immediately
+    risk = _compute_behavioral_risk(user)
+    user["risk_score"] = risk
+    
+    # Log significant anomalies directly
+    if risk > 0.8 and user["status"] == "active":
+        _add_event("SYSTEM", f"CRITICAL: User {uid} reached critical risk score {risk}!", "CRITICAL", "Behavior")
+        
+    return {"status": "success", "new_risk": risk}
 
 # ═══════════════════════════════════════════════════════════════════
 # Live Endpoints & Events
@@ -478,19 +558,21 @@ def get_anomalies(model: str = "isolation_forest", min_score: float = 0.0):
 @app.get("/api/graph")
 def get_graph():
     try:
-        df, file_access = load_dataset()
+        df = global_df
         attrs = {}
-        for _, row in df.iterrows():
-            anomaly = max(row['isolation_forest'], row['oneclass_svm'], row['autoencoder'])
-            red_team = row['is_red_team']
-            attrs[row['user']] = {
-                'anomaly': anomaly,
-                'red_team': red_team,
-                'high_risk': (anomaly > 1.5) or (red_team == 1)
-            }
+        if df is not None:
+            for _, row in df.iterrows():
+                anomaly = max(row['isolation_forest'], row['oneclass_svm'], row['autoencoder'])
+                red_team = row['is_red_team']
+                attrs[row['user']] = {
+                    'anomaly': anomaly,
+                    'red_team': red_team,
+                    'high_risk': (anomaly > 1.5) or (red_team == 1)
+                }
+                
         G = nx.Graph()
-        for _, row in file_access.iterrows():
-            G.add_edge(row['user'], row['file'], type='access')
+        for u, f in live_graph_edges:
+            G.add_edge(u, f, type='access')
         
         # Return all nodes instead of filtering
         nodes = []
@@ -580,6 +662,74 @@ def siem_policy_engine():
                 add_violation("pol-007")
                 _add_event("SIEM", f"pol-007 Violation: Killed session {sid} (Data Exfiltration >1MB).", "CRITICAL", "Data Protection")
 
-# Start SIEM engine
+def autonomous_telemetry_simulator():
+    """Runs continuously in the background to simulate live user behavior from ACTUAL dataset logs."""
+    log_index = 0
+    total_logs = len(initial_file_access) if initial_file_access is not None else 0
+    
+    while True:
+        time.sleep(1.0) # Tick every 1 second
+        
+        # Play back up to 5 real file access logs per tick to create a real-time environment
+        for _ in range(5):
+            if log_index >= total_logs: 
+                log_index = 0 # loop dataset if we reach the end
+                
+            row = initial_file_access.iloc[log_index]
+            uid = str(row['user'])
+            filename = str(row['file'])
+            access_time = row['access_time'] # This gives us a real timestamp
+            
+            # Extract hour from real access time
+            hour = access_time.hour
+            after_hours = hour < 8 or hour >= 18
+            
+            # Fire real file log
+            ingest_cert_log(CertEvent(user_id=uid, event_type="file", action="Access", details=filename))
+            
+            user = managed_users.get(uid)
+            if user:
+                is_red = user['role'] == "Insider Threat"
+                
+                # Contextual generation based on dataset logs to flesh out the environment
+                if random.random() < 0.1:
+                    ingest_cert_log(CertEvent(user_id=uid, event_type="email", action="Send", details="internal@company.com"))
+                if random.random() < 0.05:
+                    ingest_cert_log(CertEvent(user_id=uid, event_type="logon", action="Logon", details="Workstation"))
+                if after_hours and is_red and random.random() < 0.2:
+                    ingest_cert_log(CertEvent(user_id=uid, event_type="usb", action="Connect", details="SanDisk Cruzer"))
+            
+            # Update Active Sessions randomly for active users
+            ep_id = f"ep-{uid}"
+            if ep_id not in active_sessions:
+                active_sessions[ep_id] = {
+                    "id": f"sess-{len(active_sessions)+1:04d}",
+                    "agent_id": ep_id,
+                    "started": time.time(),
+                    "last_activity": time.time(),
+                    "status": "active",
+                    "protocol": "QPC-AES-256",
+                    "bytes_transferred": 0,
+                }
+            active_sessions[ep_id]["last_activity"] = time.time()
+            active_sessions[ep_id]["bytes_transferred"] += random.randint(1024, 65536)
+            
+            log_index += 1
+            
+        # Update CPU/RAM for all endpoints to simulate live machines
+        for ep_id, ep in active_endpoints.items():
+            if ep["status"] != "LOCKED":
+                ep["cpu"] = max(5, min(95, ep["cpu"] + random.randint(-10, 10)))
+                ep["ram"] = max(20, min(90, ep["ram"] + random.randint(-5, 5)))
+                ep["last_seen"] = time.time()
+                
+                # Link AI Behavioral Risk to Device Risk directly!
+                uid = ep_id.replace("ep-", "")
+                if uid in managed_users:
+                    ep["risk_score"] = managed_users[uid]["risk_score"]
+
+# Start SIEM and Simulation engines
 threading.Thread(target=siem_policy_engine, daemon=True).start()
+threading.Thread(target=autonomous_telemetry_simulator, daemon=True).start()
+
 

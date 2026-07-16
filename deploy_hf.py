@@ -1,7 +1,7 @@
 from huggingface_hub import HfApi
 api = HfApi()
 
-username = api.whoami()["name"]
+username = "Shlok0829"
 repo_id = f"{username}/vortex-siem-backend"
 
 print(f"Deploying to existing space {repo_id}...")

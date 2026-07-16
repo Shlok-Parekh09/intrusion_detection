@@ -13,7 +13,7 @@ os.makedirs(MODEL_DIR, exist_ok=True)
 
 # Load features
 df = pd.read_csv(os.path.join(DATA_DIR, 'merged_features.csv'))
-X = df.drop(['user', 'is_red_team'], axis=1)
+X = df.drop(['user', 'is_red_team'], axis=1).fillna(0)
 scaler = StandardScaler()
 X_scaled = scaler.fit_transform(X)
 

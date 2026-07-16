@@ -123,42 +123,40 @@ login_trends_by_hour = {str(i).zfill(2): {"successful": 0, "failed": 0} for i in
 
 try:
     global_df, initial_file_access = load_dataset()
-    for clone_idx in range(500):
-        for _, row in global_df.iterrows():
-            base_uid = str(row['user'])
-            uid = f"{base_uid}_{clone_idx}"
-            is_red = bool(row.get('is_red_team', 0))
-            managed_users[uid] = {
-                "id": uid, "name": uid, "role": "Employee" if not is_red else "Insider Threat",
-                "group": "Staff", "department": "Operations", "access_level": "Standard",
-                "status": "active", "mfa": True, "risk_score": 0.0,
-                "login_count_today": 0, # Start at 0 for live simulation
-                "failed_logins_today": 0,
-                "files_accessed_today": 0, # Start at 0
-                "email_count_today": 0,
-                "after_hours_activity": False,
-                "usb_attempts": 0, 
-                "last_login": time.time() - random.randint(100, 3600),
-                "behavioral_baseline": {"avg_files": 15, "avg_logins": 2, "avg_hours": 8},
-            }
-            
-            anomaly = max(row['isolation_forest'], row['oneclass_svm'], row['autoencoder'])
-            global_attrs[uid] = {
-                'anomaly': anomaly,
-                'red_team': is_red,
-                'high_risk': (anomaly > 1.5) or is_red
-            }
-            
-            active_endpoints[f"ep-{uid}"] = {
-                "agent_id": f"ep-{uid}",
-                "timestamp": time.time(),
-                "cpu": random.randint(10, 80),
-                "ram": random.randint(20, 90),
-                "net_conns": random.randint(5, 50),
-                "risk_score": 0.0,
-                "status": "SECURE",
-                "last_seen": time.time() - random.randint(0, 20)
-            }
+    for _, row in global_df.iterrows():
+        uid = str(row['user'])
+        is_red = bool(row.get('is_red_team', 0))
+        managed_users[uid] = {
+            "id": uid, "name": uid, "role": "Employee" if not is_red else "Insider Threat",
+            "group": "Staff", "department": "Operations", "access_level": "Standard",
+            "status": "active", "mfa": True, "risk_score": 0.0,
+            "login_count_today": 0, # Start at 0 for live simulation
+            "failed_logins_today": 0,
+            "files_accessed_today": 0, # Start at 0
+            "email_count_today": 0,
+            "after_hours_activity": False,
+            "usb_attempts": 0, 
+            "last_login": time.time() - random.randint(100, 3600),
+            "behavioral_baseline": {"avg_files": 15, "avg_logins": 2, "avg_hours": 8},
+        }
+        
+        anomaly = max(row['isolation_forest'], row['oneclass_svm'], row['autoencoder'])
+        global_attrs[uid] = {
+            'anomaly': anomaly,
+            'red_team': is_red,
+            'high_risk': (anomaly > 1.5) or is_red
+        }
+        
+        active_endpoints[f"ep-{uid}"] = {
+            "agent_id": f"ep-{uid}",
+            "timestamp": time.time(),
+            "cpu": random.randint(10, 80),
+            "ram": random.randint(20, 90),
+            "net_conns": random.randint(5, 50),
+            "risk_score": 0.0,
+            "status": "SECURE",
+            "last_seen": time.time() - random.randint(0, 20)
+        }
     # The graph will start empty and build dynamically as logs arrive!
         
     print(f"Successfully loaded {len(managed_users)} users from Hugging Face.")
@@ -703,8 +701,7 @@ def autonomous_telemetry_simulator():
     
     # Pre-seed graph with some edges so it's not totally empty on boot
     for i in range(min(50, total_logs)):
-        base_u = str(initial_file_access.iloc[i]['user'])
-        u = f"{base_u}_{random.randint(0, 499)}"
+        u = str(initial_file_access.iloc[i]['user'])
         f = str(initial_file_access.iloc[i]['file'])
         live_graph_edges.append((u, f))
     
@@ -727,13 +724,9 @@ def autonomous_telemetry_simulator():
                 log_index = 0 # loop dataset if we reach the end
                 
             row = initial_file_access.iloc[log_index]
-            base_uid = str(row['user'])
+            uid = str(row['user'])
             filename = str(row['file'])
             access_time = row['access_time'] # This gives us a real timestamp
-            
-            # Randomly map this log to one of our 500 clones for this base user
-            clone_idx = random.randint(0, 499)
-            uid = f"{base_uid}_{clone_idx}"
             
             # Extract hour from real access time
             hour = access_time.hour

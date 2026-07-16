@@ -5,13 +5,13 @@ from datetime import datetime, timedelta
 
 os.makedirs('data', exist_ok=True)
 
-USERS = [f'user{i}' for i in range(1, 21)]
-FILES = [f'file_{i}.docx' for i in range(1, 51)]
-DEVICES = [f'usb_{i}' for i in range(1, 6)]
-EMAILS = [f'user{i}@company.com' for i in range(1, 21)]
+USERS = [f'user{i}' for i in range(1, 10001)]
+FILES = [f'file_{i}.docx' for i in range(1, 201)]
+DEVICES = [f'usb_{i}' for i in range(1, 101)]
+EMAILS = [f'user{i}@company.com' for i in range(1, 10001)]
 
 START_DATE = datetime(2023, 1, 1)
-DAYS = 30
+DAYS = 1
 
 random.seed(42)
 
@@ -29,11 +29,12 @@ def simulate_file_access():
     records = []
     for day in range(DAYS):
         date = START_DATE + timedelta(days=day)
-        for _ in range(random.randint(50, 100)):
-            user = random.choice(USERS)
-            file = random.choice(FILES)
-            access_time = date + timedelta(hours=random.randint(0, 23), minutes=random.randint(0, 59))
-            records.append({'user': user, 'file': file, 'access_time': access_time})
+        # Give each of the 10,000 users 1 to 3 file access events per day
+        for user in USERS:
+            for _ in range(random.randint(1, 3)):
+                file = random.choice(FILES)
+                access_time = date + timedelta(hours=random.randint(0, 23), minutes=random.randint(0, 59))
+                records.append({'user': user, 'file': file, 'access_time': access_time})
     pd.DataFrame(records).to_csv('data/file_access.csv', index=False)
 
 def simulate_usb_usage():
@@ -52,9 +53,11 @@ def simulate_emails():
     records = []
     for day in range(DAYS):
         date = START_DATE + timedelta(days=day)
-        for _ in range(random.randint(30, 60)):
+        # Random sample of 1,000 emails per day
+        for _ in range(1000):
             sender = random.choice(EMAILS)
-            recipient = random.choice([e for e in EMAILS if e != sender])
+            # Fast recipient pick
+            recipient = f"user{random.randint(1, 10000)}@company.com"
             time = date + timedelta(hours=random.randint(7, 19), minutes=random.randint(0, 59))
             subject = random.choice(['Project Update', 'Meeting', 'Invoice', 'Confidential', 'Request'])
             records.append({'sender': sender, 'recipient': recipient, 'time': time, 'subject': subject})

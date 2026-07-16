@@ -53,7 +53,6 @@ export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGra
   const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
   const [pinnedNode, setPinnedNode] = useState<GraphNode | null>(null);
   const [zoom, setZoom] = useState(1.0);
-  const [isLoading, setIsLoading] = useState(true);
   const [width, setWidth] = useState(800);
 
   useEffect(() => {
@@ -141,17 +140,6 @@ export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGra
   const handleNodeHover = useCallback((node: GraphNode | null) => {
     setHoveredNode(node);
     document.body.style.cursor = node ? 'pointer' : 'default';
-  }, []);
-
-  // Update D3 physics to prevent nodes from exploding into a 'galaxy'
-  useEffect(() => {
-    if (fgRef.current) {
-      // Significantly reduce repulsion so nodes stay together
-      fgRef.current.d3Force('charge').strength(-30);
-      fgRef.current.d3Force('link').distance(20);
-      // Center force keeps them in view
-      fgRef.current.d3Force('center').strength(0.1);
-    }
   }, []);
 
   const handleNodeClick = useCallback((node: GraphNode) => {
@@ -242,44 +230,10 @@ export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGra
           linkDirectionalParticleWidth={1.5}
           linkDirectionalParticleColor={() => "rgba(255,255,255,0.7)"}
           d3VelocityDecay={0.4}
-          cooldownTicks={100}
-          warmupTicks={50}
           onNodeHover={handleNodeHover}
           onNodeClick={handleNodeClick}
           onBackgroundClick={handleBackgroundClick}
-          onEngineStop={() => {
-            if (isLoading) {
-              if (fgRef.current && data.nodes.length > 0) {
-                let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-                let validNodes = 0;
-                data.nodes.forEach(n => {
-                  if (typeof n.x === 'number' && typeof n.y === 'number') {
-                    minX = Math.min(minX, n.x as number);
-                    maxX = Math.max(maxX, n.x as number);
-                    minY = Math.min(minY, n.y as number);
-                    maxY = Math.max(maxY, n.y as number);
-                    validNodes++;
-                  }
-                });
-                if (validNodes > 0 && Number.isFinite(minX)) {
-                  const cx = (minX + maxX) / 2;
-                  const cy = (minY + maxY) / 2;
-                  fgRef.current.centerAt(cx, cy, 0);
-                  fgRef.current.zoom(1.0, 0);
-                  setZoom(1.0);
-                }
-              }
-              setIsLoading(false);
-            }
-          }}
         />
-
-        {/* Loading state */}
-        {isLoading && (
-          <div className="force-graph-loading">
-            <Skeleton variant="rectangular" width="100%" height={height} />
-          </div>
-        )}
 
         {/* Hover tooltip */}
         {hoveredNode && (

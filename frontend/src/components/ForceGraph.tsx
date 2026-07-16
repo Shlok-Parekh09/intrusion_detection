@@ -241,15 +241,17 @@ export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGra
             if (isLoading) {
               if (fgRef.current && data.nodes.length > 0) {
                 let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+                let validNodes = 0;
                 data.nodes.forEach(n => {
-                  if (n.x !== undefined && n.y !== undefined) {
+                  if (Number.isFinite(n.x) && Number.isFinite(n.y)) {
                     minX = Math.min(minX, n.x);
                     maxX = Math.max(maxX, n.x);
                     minY = Math.min(minY, n.y);
                     maxY = Math.max(maxY, n.y);
+                    validNodes++;
                   }
                 });
-                if (minX !== Infinity) {
+                if (validNodes > 0 && Number.isFinite(minX)) {
                   const cx = (minX + maxX) / 2;
                   const cy = (minY + maxY) / 2;
                   fgRef.current.centerAt(cx, cy, 0);

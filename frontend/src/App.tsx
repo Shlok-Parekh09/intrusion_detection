@@ -106,14 +106,35 @@ function App() {
     localStorage.setItem('sidebar-collapsed', JSON.stringify(sidebarCollapsed));
   }, [sidebarCollapsed]);
 
-  // Stable graph state: track known node IDs so we never replace existing D3 node objects
-  const knownNodeIds = useRef<Set<string>>(new Set());
+  // Load the daily graph snapshot ONCE on startup — never poll it again
+  // This shows all user connections for the day as a beautiful static display
+  const graphLoaded = useRef(false);
+  useEffect(() => {
+    if (graphLoaded.current) return;
+    graphLoaded.current = true;
 
-  // Fetch live data
+    const loadGraph = async () => {
+      try {
+        // Retry up to 5 times in case backend is still booting
+        for (let attempt = 0; attempt < 5; attempt++) {
+          const state = await gradioFetch('get_dashboard_state');
+          if (state?.graph?.nodes?.length > 0) {
+            setGraphData({ nodes: state.graph.nodes, links: state.graph.links });
+            return;
+          }
+          await new Promise(r => setTimeout(r, 3000)); // Wait 3s between retries
+        }
+      } catch (err) {
+        console.error('Graph load failed:', err);
+      }
+    };
+    loadGraph();
+  }, []);
+
+  // Live polling — dashboard stats only, no graph (graph is a static daily snapshot)
   useEffect(() => {
     const tick = async () => {
       tickCount.current += 1;
-      
       try {
         const state = await gradioFetch('get_dashboard_state');
         if (state && typeof state === 'object' && 'endpoints' in state) {
@@ -124,44 +145,15 @@ function App() {
           setPolicies(state.policies);
           setSessions(state.sessions);
           setLoginTrends(state.trends);
-          
-          if (state.graph && state.graph.nodes) {
-            // Check if there are genuinely new nodes before touching graphData
-            const incomingIds = new Set<string>(state.graph.nodes.map((n: any) => n.id as string));
-            const hasNewNodes = state.graph.nodes.some((n: any) => !knownNodeIds.current.has(n.id));
-            
-            if (hasNewNodes) {
-              // Only mutate state when new nodes actually arrive
-              incomingIds.forEach(id => knownNodeIds.current.add(id));
-              
-              setGraphData(prev => {
-                const existingNodeMap = new Map<string, any>();
-                for (const n of prev.nodes) existingNodeMap.set(n.id, n);
-                
-                const mergedNodes = state.graph.nodes.map((n: any) => {
-                  const existing = existingNodeMap.get(n.id);
-                  if (existing) {
-                    // Preserve every D3 physics property — do NOT replace the object
-                    existing.risk = n.risk;
-                    existing.is_red = n.is_red;
-                    existing.label = n.label;
-                    return existing; // Return SAME object reference — D3 keeps its x/y/vx/vy
-                  }
-                  // New node: let D3 place it naturally using repulsion physics
-                  return { ...n };
-                });
-                return { nodes: mergedNodes, links: state.graph.links };
-              });
-            }
-          }
+          // Graph intentionally NOT updated — it's a static daily snapshot
         }
       } catch (err) {
-        console.error("Dashboard state fetch failed:", err);
+        console.error('Dashboard state fetch failed:', err);
       }
     };
     tick();
     
-    // Poll every 500ms — safe because it's only 1 aggregated request, and graph only updates when nodes change
+    // Poll every 500ms — only dashboard stats, no graph churn
     const iv = setInterval(tick, 500);
     return () => clearInterval(iv);
   }, []);

@@ -624,6 +624,8 @@ def get_graph():
 # SIEM Policy Enforcement Engine
 # ═══════════════════════════════════════════════════════════════════
 def is_policy_enabled(pol_id):
+    # Disable pol-008 by default to prevent mass lockout during fast simulation
+    if pol_id == "pol-008": return False
     for p in security_policies:
         if p["id"] == pol_id: return p["enabled"]
     return False
@@ -701,6 +703,12 @@ def autonomous_telemetry_simulator():
     while True:
         time.sleep(0.1) # Tick every 0.1 second (blazing fast)
         
+        # Decay stats slightly every tick to create a moving average (prevents infinite accumulation)
+        for u in managed_users.values():
+            u["files_accessed_today"] = int(u.get("files_accessed_today", 0) * 0.999)
+            u["login_count_today"] = int(u.get("login_count_today", 0) * 0.999)
+            u["failed_logins_today"] = int(u.get("failed_logins_today", 0) * 0.999)
+
         # Play back up to 25 real file access logs per tick to create a real-time environment
         for _ in range(25):
             if log_index >= total_logs: 

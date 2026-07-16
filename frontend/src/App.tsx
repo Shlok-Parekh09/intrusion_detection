@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
   PieChart, Pie, Cell
@@ -252,7 +252,6 @@ function App() {
 // ═══════════════════════════════════════════════════════════════════
 function PageDashboard({ endpoints, events, graphData, users, locked, criticals, loginTrends }: any) {
   const trends = loginTrends && loginTrends.length > 0 ? loginTrends : [];
-  const now = new Date();
   const riskDist = [
     { name: 'Low', value: users.filter((u: any) => u.risk_score < 0.3).length, color: '#22c55e' },
     { name: 'Medium', value: users.filter((u: any) => u.risk_score >= 0.3 && u.risk_score < 0.5).length, color: '#3b82f6' },

@@ -240,6 +240,10 @@ export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGra
           linkDirectionalParticleWidth={1.5}
           linkDirectionalParticleColor={() => "rgba(255,255,255,0.7)"}
           d3VelocityDecay={0.8}
+          warmupTicks={100}
+          cooldownTicks={0}
+          enableZoomInteraction={false}
+          enablePanInteraction={false}
           onNodeHover={handleNodeHover}
           onNodeClick={handleNodeClick}
           onBackgroundClick={handleBackgroundClick}

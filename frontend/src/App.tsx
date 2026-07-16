@@ -109,14 +109,12 @@ function App() {
       gradioFetch('get_users').then(d => { if (Array.isArray(d)) setUsers(d); });
       gradioFetch('get_policies').then(d => { if (Array.isArray(d)) setPolicies(d); });
       gradioFetch('get_sessions').then(d => { if (Array.isArray(d)) setSessions(d); });
+      gradioFetch('get_graph').then(d => { if (d?.nodes) setGraphData(d); });
     };
     tick();
     const iv = setInterval(tick, 3000);
     return () => clearInterval(iv);
   }, []);
-
-  // Graph once
-  useEffect(() => { gradioFetch('get_graph').then(d => { if (d?.nodes) setGraphData(d); }); }, []);
 
   // API actions
   const userAction = async (uid: string, action: string, reason?: string) => {

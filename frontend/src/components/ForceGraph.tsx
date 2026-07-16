@@ -49,10 +49,21 @@ const NODE_COLORS = {
 
 export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGraphEnhancedProps) {
   const fgRef = useRef<any>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
   const [pinnedNode, setPinnedNode] = useState<GraphNode | null>(null);
   const [zoom, setZoom] = useState(1.0);
   const [isLoading, setIsLoading] = useState(true);
+  const [width, setWidth] = useState(800);
+
+  useEffect(() => {
+    if (containerRef.current) setWidth(containerRef.current.offsetWidth);
+    const handleResize = () => {
+      if (containerRef.current) setWidth(containerRef.current.offsetWidth);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Calculate node size
   const getNodeSize = useCallback(() => {
@@ -213,10 +224,11 @@ export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGra
   }
 
   return (
-    <div className="force-graph-container" style={{ height }}>
+    <div className="force-graph-container" style={{ height }} ref={containerRef}>
       <div className="force-graph-canvas-wrapper">
         <ForceGraph2D
           ref={fgRef}
+          width={width}
           graphData={data as any}
           backgroundColor="transparent"
           nodeRelSize={6}

@@ -123,9 +123,9 @@ login_trends_by_hour = {str(i).zfill(2): {"successful": 0, "failed": 0} for i in
 
 try:
     global_df, initial_file_access = load_dataset()
-    roles = ["Software Engineer", "HR Manager", "Financial Analyst", "System Admin", "Data Scientist", "Sales Executive", "Marketing Specialist", "Product Manager"]
-    departments = ["Engineering", "Human Resources", "Finance", "IT", "Data Analytics", "Sales", "Marketing", "Product"]
-    groups = ["Staff", "Management", "Contractor", "Executive"]
+    roles = ["Software Engineer", "HR Manager", "Financial Analyst", "System Admin", "Data Scientist", "Sales Executive", "Marketing Specialist", "Product Manager", "Pentester", "ML Engineer", "DevOps Engineer", "Frontend Developer", "Backend Developer", "Security Analyst"]
+    departments = ["Engineering", "Human Resources", "Finance", "IT", "Data Analytics", "Sales", "Marketing", "Product", "Cybersecurity", "Operations"]
+    groups = ["Staff", "Management", "Contractor", "Executive", "Freelancer"]
     access_levels = ["Standard", "Privileged", "Admin", "Restricted"]
 
     for _, row in global_df.iterrows():
@@ -152,19 +152,21 @@ try:
             'high_risk': (anomaly > 1.5) or is_red
         }
         
+    # Pre-select exactly 30 users to be online "early birds" to simulate morning login organically
+    initial_uids = random.sample(list(managed_users.keys()), min(30, len(managed_users)))
+    for uid in initial_uids:
         active_endpoints[f"ep-{uid}"] = {
             "agent_id": f"ep-{uid}",
             "timestamp": time.time(),
             "cpu": random.randint(10, 80),
             "ram": random.randint(20, 90),
             "net_conns": random.randint(5, 50),
-            "risk_score": 0.0,
+            "risk_score": managed_users[uid]["risk_score"],
             "status": "SECURE",
             "last_seen": time.time() - random.randint(0, 20)
         }
-    # The graph will start empty and build dynamically as logs arrive!
         
-    print(f"Successfully loaded {len(managed_users)} users from Hugging Face.")
+    print(f"Successfully loaded {len(managed_users)} users from Hugging Face. Pre-started {len(active_endpoints)} endpoints.")
 except Exception as e:
     print(f"Failed to initialize dataset: {e}")
 
@@ -743,6 +745,20 @@ def autonomous_telemetry_simulator():
             user = managed_users.get(uid)
             if user:
                 is_red = user['role'] == "Insider Threat"
+                
+                # Make sure the user is marked as "online" in endpoints if they just did something
+                ep_id = f"ep-{uid}"
+                if ep_id not in active_endpoints:
+                    active_endpoints[ep_id] = {
+                        "agent_id": ep_id,
+                        "timestamp": time.time(),
+                        "cpu": random.randint(10, 80),
+                        "ram": random.randint(20, 90),
+                        "net_conns": random.randint(5, 50),
+                        "risk_score": user["risk_score"],
+                        "status": "SECURE",
+                        "last_seen": time.time()
+                    }
                 
                 # Contextual generation based on dataset logs to flesh out the environment
                 if random.random() < 0.1:

@@ -63,6 +63,14 @@ export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGra
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Auto-center graph when data populates
+  useEffect(() => {
+    if (data.nodes.length > 0 && fgRef.current) {
+      // Zoom to fit the graph beautifully on first load or when it grows
+      fgRef.current.zoomToFit(500, 30);
+    }
+  }, [data.nodes.length]);
+
   // Calculate node size
   const getNodeSize = useCallback(() => {
     return 5;

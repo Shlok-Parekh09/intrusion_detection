@@ -701,7 +701,7 @@ def autonomous_telemetry_simulator():
     total_logs = len(initial_file_access) if initial_file_access is not None else 0
     
     while True:
-        time.sleep(0.1) # Tick every 0.1 second (blazing fast)
+        time.sleep(1.0) # Tick every 1.0 second (one by one clearly)
         
         # Decay stats slightly every tick to create a moving average (prevents infinite accumulation)
         for u in managed_users.values():
@@ -713,8 +713,8 @@ def autonomous_telemetry_simulator():
             if s["status"] == "active":
                 s["bytes_transferred"] = int(s.get("bytes_transferred", 0) * 0.9)
 
-        # Play back up to 25 real file access logs per tick to create a real-time environment
-        for _ in range(25):
+        # Play back 1 real file access log per tick to create a clear one-by-one real-time environment
+        for _ in range(1):
             if log_index >= total_logs: 
                 log_index = 0 # loop dataset if we reach the end
                 

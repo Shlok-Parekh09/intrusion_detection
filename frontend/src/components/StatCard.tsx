@@ -43,7 +43,7 @@ export function StatCard({ icon, iconClass, label, value, sub, subClass, trend, 
       const eased = 1 - Math.pow(1 - progress, 4);
       
       const currentValue = startValue + (endValue - startValue) * eased;
-      setDisplayValue(Math.round(currentValue * 100) / 100);
+      setDisplayValue(Math.round(currentValue));
 
       if (progress < 1) {
         requestAnimationFrame(animate);
@@ -60,7 +60,7 @@ export function StatCard({ icon, iconClass, label, value, sub, subClass, trend, 
     if (typeof value === 'string') return value;
     if (val >= 1000000) return (val / 1000000).toFixed(1) + 'M';
     if (val >= 1000) return (val / 1000).toFixed(1) + 'K';
-    return Math.round(val * 100) / 100;
+    return Math.round(val);
   };
 
   return (

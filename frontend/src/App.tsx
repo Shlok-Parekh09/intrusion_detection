@@ -54,7 +54,7 @@ const NAV_ITEMS: { id: NavPage; label: string; icon: any; section?: string }[] =
   { id: 'audit', label: 'Audit Logs', icon: FileText, section: 'MONITORING' },
 ];
 
-function fmtTime(ts: number) { return new Date(ts * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }); }
+function fmtTime(ts: number) { return new Date(ts * 1000).toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }); }
 function fmtBytes(b: number) { if (b < 1024) return b + ' B'; if (b < 1048576) return (b / 1024).toFixed(1) + ' KB'; return (b / 1048576).toFixed(1) + ' MB'; }
 function progClass(v: number) { return v < 50 ? 'low' : v < 80 ? 'medium' : 'high'; }
 function riskColor(r: number) { return r >= 0.8 ? '#ef4444' : r >= 0.5 ? '#f59e0b' : r >= 0.3 ? '#3b82f6' : '#22c55e'; }
@@ -222,7 +222,7 @@ function App() {
               read: false,
             }))} />
             <UserMenu userName="Shlok Parekh" userRole="SOC Admin" />
-            <span className="system-time">{clock.toLocaleTimeString('en-US', { hour12: false })}</span>
+            <span className="system-time">{clock.toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour12: false })} IST</span>
           </div>
         </header>
 

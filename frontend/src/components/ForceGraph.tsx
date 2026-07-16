@@ -51,12 +51,12 @@ export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGra
   const fgRef = useRef<any>(null);
   const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
   const [pinnedNode, setPinnedNode] = useState<GraphNode | null>(null);
-  const [zoom, setZoom] = useState(0.4);
+  const [zoom, setZoom] = useState(1.0);
   const [isLoading, setIsLoading] = useState(true);
 
   // Calculate node size
   const getNodeSize = useCallback(() => {
-    return 2;
+    return 5;
   }, []);
 
   // Get node color by user request
@@ -250,7 +250,8 @@ export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGra
                   const cx = (minX + maxX) / 2;
                   const cy = (minY + maxY) / 2;
                   fgRef.current.centerAt(cx, cy, 0);
-                  fgRef.current.zoom(0.8, 0);
+                  fgRef.current.zoom(1.0, 0);
+                  setZoom(1.0);
                 }
               }
               setIsLoading(false);

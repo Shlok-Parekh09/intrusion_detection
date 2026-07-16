@@ -123,8 +123,8 @@ function App() {
       gradioFetch('get_sessions').then(d => { if (Array.isArray(d)) setSessions(d); });
       gradioFetch('get_login_trends').then(d => { if (Array.isArray(d)) setLoginTrends(d); });
       
-      // Update graph every 10 ticks (5 seconds) to allow the graph physics to slowly transition and settle
-      if (tickCount.current % 10 === 0) {
+      // Update graph every 2 ticks (6 seconds) to allow the graph physics to slowly transition and settle
+      if (tickCount.current % 2 === 0) {
         gradioFetch('get_graph').then(d => { 
           if (d?.nodes) {
             // Merge new data into existing graph to preserve D3 node positions
@@ -148,7 +148,9 @@ function App() {
       }
     };
     tick();
-    const iv = setInterval(tick, 500);
+    
+    // Poll every 3 seconds (3000ms) to avoid Hugging Face 429 Rate Limit
+    const iv = setInterval(tick, 3000);
     return () => clearInterval(iv);
   }, []);
 

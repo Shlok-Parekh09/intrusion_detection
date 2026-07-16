@@ -106,6 +106,9 @@ function App() {
     localStorage.setItem('sidebar-collapsed', JSON.stringify(sidebarCollapsed));
   }, [sidebarCollapsed]);
 
+  // Stable graph state: track known node IDs so we never replace existing D3 node objects
+  const knownNodeIds = useRef<Set<string>>(new Set());
+
   // Fetch live data
   useEffect(() => {
     const tick = async () => {
@@ -123,20 +126,33 @@ function App() {
           setLoginTrends(state.trends);
           
           if (state.graph && state.graph.nodes) {
-            setGraphData(prev => {
-              const existingNodeMap = new Map<string, any>();
-              for (const n of prev.nodes) {
-                existingNodeMap.set(n.id, n);
-              }
-              const mergedNodes = state.graph.nodes.map((n: any) => {
-                const existing = existingNodeMap.get(n.id);
-                if (existing) {
-                  return { ...n, x: existing.x, y: existing.y, vx: existing.vx, vy: existing.vy, fx: existing.fx, fy: existing.fy };
-                }
-                return n;
+            // Check if there are genuinely new nodes before touching graphData
+            const incomingIds = new Set<string>(state.graph.nodes.map((n: any) => n.id as string));
+            const hasNewNodes = state.graph.nodes.some((n: any) => !knownNodeIds.current.has(n.id));
+            
+            if (hasNewNodes) {
+              // Only mutate state when new nodes actually arrive
+              incomingIds.forEach(id => knownNodeIds.current.add(id));
+              
+              setGraphData(prev => {
+                const existingNodeMap = new Map<string, any>();
+                for (const n of prev.nodes) existingNodeMap.set(n.id, n);
+                
+                const mergedNodes = state.graph.nodes.map((n: any) => {
+                  const existing = existingNodeMap.get(n.id);
+                  if (existing) {
+                    // Preserve every D3 physics property — do NOT replace the object
+                    existing.risk = n.risk;
+                    existing.is_red = n.is_red;
+                    existing.label = n.label;
+                    return existing; // Return SAME object reference — D3 keeps its x/y/vx/vy
+                  }
+                  // New node: let D3 place it naturally using repulsion physics
+                  return { ...n };
+                });
+                return { nodes: mergedNodes, links: state.graph.links };
               });
-              return { nodes: mergedNodes, links: state.graph.links };
-            });
+            }
           }
         }
       } catch (err) {
@@ -145,7 +161,7 @@ function App() {
     };
     tick();
     
-    // Poll every 500ms for ultra-fast real-time updates (Safe now because it's only 1 aggregated request)
+    // Poll every 500ms — safe because it's only 1 aggregated request, and graph only updates when nodes change
     const iv = setInterval(tick, 500);
     return () => clearInterval(iv);
   }, []);

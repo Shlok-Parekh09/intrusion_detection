@@ -416,6 +416,74 @@ def get_login_trends():
         })
     return trends
 
+@app.get("/api/v1/dashboard-state")
+def get_dashboard_state():
+    """Aggregated endpoint to prevent 429 Rate Limits by serving everything in 1 request."""
+    # 1. Endpoints
+    now = time.time()
+    active_eps = [ep for ep in active_endpoints.values() if now - ep["last_seen"] < 30]
+    
+    # 2. Events
+    filtered_events = sorted(live_events, key=lambda x: x["time"], reverse=True)[:50]
+    
+    # 3. Users
+    users_list = []
+    for uid, u in managed_users.items():
+        u_copy = dict(u)
+        u_copy["risk_score"] = _compute_behavioral_risk(u)
+        users_list.append(u_copy)
+    users_list = sorted(users_list, key=lambda x: x["risk_score"], reverse=True)
+    
+    # 4. Sessions
+    sessions_list = []
+    for sid, s in active_sessions.items():
+        s_copy = dict(s)
+        s_copy["duration_seconds"] = int(now - s["started"])
+        s_copy["idle_seconds"] = int(now - s["last_activity"])
+        sessions_list.append(s_copy)
+    sessions_list = sorted(sessions_list, key=lambda x: x["last_activity"], reverse=True)
+    
+    # 5. Trends
+    trends = []
+    current_hour = time.localtime().tm_hour
+    for i in range(7, -1, -1):
+        h = (current_hour - i) % 24
+        h_str = str(h).zfill(2)
+        trends.append({
+            "time": f"{h_str}:00",
+            "successful": login_trends_by_hour[h_str]["successful"],
+            "failed": login_trends_by_hour[h_str]["failed"]
+        })
+        
+    # 6. Graph
+    graph_nodes = []
+    graph_links = []
+    unique_nodes = set()
+    
+    for uid, fid in live_graph_edges:
+        if uid not in unique_nodes:
+            attrs = global_attrs.get(uid, {})
+            graph_nodes.append({
+                "id": uid, "type": "user",
+                "risk": managed_users.get(uid, {}).get("risk_score", 0),
+                "is_red": attrs.get('red_team', False)
+            })
+            unique_nodes.add(uid)
+        if fid not in unique_nodes:
+            graph_nodes.append({"id": fid, "type": "file", "risk": 0})
+            unique_nodes.add(fid)
+        graph_links.append({"source": uid, "target": fid})
+        
+    return {
+        "endpoints": active_eps,
+        "events": filtered_events,
+        "users": users_list,
+        "policies": security_policies,
+        "sessions": sessions_list,
+        "trends": trends,
+        "graph": {"nodes": graph_nodes, "links": graph_links}
+    }
+
 
 # ═══════════════════════════════════════════════════════════════════
 # User Management (Insider Threat Control)

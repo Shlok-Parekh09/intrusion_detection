@@ -54,7 +54,6 @@ export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGra
   const [zoom, setZoom] = useState(1.0);
   const [width, setWidth] = useState(800);
 
-  const hasInitialZoomed = useRef(false);
 
   useEffect(() => {
     if (containerRef.current) setWidth(containerRef.current.offsetWidth);
@@ -65,18 +64,19 @@ export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGra
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Auto-center graph when data populates initially
+  // Auto-center graph whenever node count changes
   useEffect(() => {
-    if (data.nodes.length > 0 && fgRef.current && !hasInitialZoomed.current) {
-      // Zoom to fit the graph beautifully on first load, then let user control it
-      fgRef.current.zoomToFit(500, 30);
-      hasInitialZoomed.current = true;
+    if (data.nodes.length > 0 && fgRef.current) {
+      // Small delay to let D3 finish layout before fitting
+      setTimeout(() => {
+        fgRef.current?.zoomToFit(400, 60);
+      }, 300);
     }
   }, [data.nodes.length]);
 
-  // Calculate node size
+  // Calculate node size - bigger so labels are readable
   const getNodeSize = useCallback(() => {
-    return 5;
+    return 8;
   }, []);
 
   // Get node color by user request
@@ -127,14 +127,14 @@ export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGra
     ctx.fillStyle = color.fill;
     ctx.fill();
 
-    // Draw label on zoom (reduced text size)
-    if (globalScale > 0.8) {
-      ctx.font = `${Math.max(4, 6 / globalScale)}px Inter`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'top';
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-      ctx.fillText(node.label || node.id, node.x, node.y + r + 2 / globalScale);
-    }
+    // Always draw labels so user can see node names
+    const fontSize = Math.max(3.5, 10 / globalScale);
+    ctx.font = `600 ${fontSize}px Inter, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    const label = (node.label || node.id || '').substring(0, 12);
+    ctx.fillText(label, node.x, node.y + r + 2 / globalScale);
 
     // Highlight pinned node
     if (pinnedNode && pinnedNode.id === node.id) {
@@ -242,8 +242,8 @@ export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGra
           d3VelocityDecay={0.8}
           warmupTicks={100}
           cooldownTicks={0}
-          enableZoomInteraction={false}
-          enablePanInteraction={false}
+          enableZoomInteraction={true}
+          enablePanInteraction={true}
           onNodeHover={handleNodeHover}
           onNodeClick={handleNodeClick}
           onBackgroundClick={handleBackgroundClick}

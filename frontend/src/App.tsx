@@ -110,47 +110,43 @@ function App() {
   useEffect(() => {
     const tick = async () => {
       tickCount.current += 1;
-      // Mark as connected once we successfully get endpoints
-      gradioFetch('get_endpoints').then(d => { 
-        if (Array.isArray(d)) {
-          setEndpoints(d);
-          setIsConnecting(false);
-        }
-      });
-      gradioFetch('get_events').then(d => { if (Array.isArray(d)) setEvents(d); });
-      gradioFetch('get_users').then(d => { if (Array.isArray(d)) setUsers(d); });
-      gradioFetch('get_policies').then(d => { if (Array.isArray(d)) setPolicies(d); });
-      gradioFetch('get_sessions').then(d => { if (Array.isArray(d)) setSessions(d); });
-      gradioFetch('get_login_trends').then(d => { if (Array.isArray(d)) setLoginTrends(d); });
       
-      // Update graph every 2 ticks (6 seconds) to allow the graph physics to slowly transition and settle
-      if (tickCount.current % 2 === 0) {
-        gradioFetch('get_graph').then(d => { 
-          if (d?.nodes) {
-            // Merge new data into existing graph to preserve D3 node positions
+      try {
+        const state = await gradioFetch('get_dashboard_state');
+        if (state && typeof state === 'object' && 'endpoints' in state) {
+          setIsConnecting(false);
+          setEndpoints(state.endpoints);
+          setEvents(state.events);
+          setUsers(state.users);
+          setPolicies(state.policies);
+          setSessions(state.sessions);
+          setLoginTrends(state.trends);
+          
+          if (state.graph && state.graph.nodes) {
             setGraphData(prev => {
               const existingNodeMap = new Map<string, any>();
               for (const n of prev.nodes) {
                 existingNodeMap.set(n.id, n);
               }
-              const mergedNodes = d.nodes.map((n: any) => {
+              const mergedNodes = state.graph.nodes.map((n: any) => {
                 const existing = existingNodeMap.get(n.id);
                 if (existing) {
-                  // Preserve x, y, vx, vy from existing node so D3 doesn't reset physics
                   return { ...n, x: existing.x, y: existing.y, vx: existing.vx, vy: existing.vy, fx: existing.fx, fy: existing.fy };
                 }
-                return n; // New node, let D3 place it naturally
+                return n;
               });
-              return { nodes: mergedNodes, links: d.links };
+              return { nodes: mergedNodes, links: state.graph.links };
             });
           }
-        });
+        }
+      } catch (err) {
+        console.error("Dashboard state fetch failed:", err);
       }
     };
     tick();
     
-    // Poll every 3 seconds (3000ms) to avoid Hugging Face 429 Rate Limit
-    const iv = setInterval(tick, 3000);
+    // Poll every 500ms for ultra-fast real-time updates (Safe now because it's only 1 aggregated request)
+    const iv = setInterval(tick, 500);
     return () => clearInterval(iv);
   }, []);
 

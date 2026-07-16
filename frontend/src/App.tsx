@@ -216,6 +216,22 @@ function App() {
             <Breadcrumbs items={getPageBreadcrumb()} />
           </div>
           <div className="top-bar-right">
+            {isConnecting ? (
+              <div className="top-bar-badge warning" style={{ background: 'rgba(234,179,8,0.2)', color: '#facc15' }}>
+                <span className="relative flex h-2 w-2 mr-2" style={{ display: 'inline-block' }}>
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow-500"></span>
+                </span>
+                Waking up AI Cloud...
+              </div>
+            ) : (
+              <div className="top-bar-badge secure" style={{ background: 'rgba(34,197,94,0.2)', color: '#4ade80' }}>
+                <span className="relative flex h-2 w-2 mr-2" style={{ display: 'inline-block' }}>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                </span>
+                Connected
+              </div>
+            )}
             <div className={`top-bar-badge ${locked > 0 ? 'danger' : 'secure'}`}>
               {locked > 0 ? <ShieldAlert size={13} /> : <ShieldCheck size={13} />}
               {locked > 0 ? `${locked} Threat(s)` : 'Secure'}

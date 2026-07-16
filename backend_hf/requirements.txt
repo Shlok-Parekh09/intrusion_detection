@@ -2,7 +2,7 @@ fastapi
 uvicorn[standard]
 pydantic
 gradio
-
+spaces
 pandas
 networkx
 cryptography

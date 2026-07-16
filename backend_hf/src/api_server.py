@@ -123,12 +123,17 @@ login_trends_by_hour = {str(i).zfill(2): {"successful": 0, "failed": 0} for i in
 
 try:
     global_df, initial_file_access = load_dataset()
+    roles = ["Software Engineer", "HR Manager", "Financial Analyst", "System Admin", "Data Scientist", "Sales Executive", "Marketing Specialist", "Product Manager"]
+    departments = ["Engineering", "Human Resources", "Finance", "IT", "Data Analytics", "Sales", "Marketing", "Product"]
+    groups = ["Staff", "Management", "Contractor", "Executive"]
+    access_levels = ["Standard", "Privileged", "Admin", "Restricted"]
+
     for _, row in global_df.iterrows():
         uid = str(row['user'])
         is_red = bool(row.get('is_red_team', 0))
         managed_users[uid] = {
-            "id": uid, "name": uid, "role": "Employee" if not is_red else "Insider Threat",
-            "group": "Staff", "department": "Operations", "access_level": "Standard",
+            "id": uid, "name": uid, "role": random.choice(roles) if not is_red else "Insider Threat",
+            "group": random.choice(groups), "department": random.choice(departments), "access_level": random.choice(access_levels),
             "status": "active", "mfa": True, "risk_score": 0.0,
             "login_count_today": 0, # Start at 0 for live simulation
             "failed_logins_today": 0,

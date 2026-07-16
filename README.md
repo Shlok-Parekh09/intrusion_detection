@@ -75,3 +75,66 @@ This project was trained and simulated using the [CMU CERT Insider Threat Datase
 
 ---
 *Built for the Hackathon - Defending the digital frontier with Behavioral AI.*
+
+---
+
+## 🏆 Hackathon Submission Details
+
+### 1. Assumptions & Required Inputs
+* **Assumptions:** Assumes a 10,000-user baseline enterprise operating over multiple branches. It assumes users generate standard telemetry (file access, emails, USB usage, logins).
+* **Environments:** Vercel (Edge UI Delivery) and Hugging Face (ZeroGPU ML compute backend).
+* **Datasets Needed:** The ML engine requires chronological synthetic or real corporate logs to train personal behavioral baselines. 
+
+### 2. Technologies, Frameworks & Libraries
+* **Frontend:** React 19, TypeScript, Vite, Recharts, React-Force-Graph-2D, Lucide-React.
+* **Backend:** Python 3.10, FastAPI, Gradio API.
+* **Machine Learning / AI:** Scikit-Learn (Isolation Forest, One-Class SVM, MLPRegressor Autoencoder), Pandas, NumPy.
+* **Graph Mathematics:** NetworkX for computing Force-Directed network topologies.
+* **Datasets:** CMU CERT Insider Threat Dataset (Synthetic generation scripts based heavily on its architecture).
+
+### 3. Supporting User Flows & Process Notes
+**SOC Analyst Incident Response Flow:**
+1. Analyst logs into the centralized VORTEX dashboard.
+2. The Live Threat Topology graph flags a node glowing red (indicating anomalous lateral movement).
+3. Analyst clicks the node to view the individual's Risk Score and behavior deviations (e.g., 3:00 AM mass file downloads).
+4. Analyst clicks "Revoke Access" — the Zero Trust Policy Engine immediately isolates the device and terminates the active session network-wide.
+
+### 4. Future Potential & Real-World Use Cases
+* **Expansion:** Seamlessly integrates with **Azure Entra ID (Active Directory)** and AWS CloudTrail to ingest real-world corporate telemetry.
+* **Real-World Applicability:** Highly applicable in the **Banking and Defense** sectors to prevent corporate espionage, data exfiltration, and rogue employee sabotage.
+* **Long-Term:** The unsupervised behavioral AI continually adapts to evolving employee roles without needing manual rule updates.
+
+### 5. Innovation & Originality
+Existing solutions (like Splunk or traditional SIEMs) rely entirely on rigid, manually coded threshold rules (e.g., "Alert if 5 failed logins occur"). This creates massive alert fatigue. 
+**Our Innovation:** VORTEX is 100% unsupervised. It uses **Behavioral AI (Autoencoders)** to learn a unique psychological and technical baseline for *every single employee*. We also provide a **Physics-Based D3 Force Graph** mapping lateral movement in real-time, making visual threat hunting incredibly intuitive compared to boring tabular logs.
+
+### 6. Usability & Interaction Design
+The interface was built specifically to reduce SOC Analyst fatigue. By utilizing an automated risk-scoring system, analysts do not need to parse thousands of raw log lines. The UI is simple, color-coded (Red/Green), and interactive. A clean sidebar navigation combined with high-contrast dark mode ensures critical alerts are visible at a glance.
+
+### 7. Scalability Across the Enterprise
+* **Backend:** Built on serverless, stateless API architecture allowing infinite horizontal scaling for log ingestion.
+* **Graph Engine:** Incorporates node-by-node incremental rendering and velocity decay to handle massive 10,000+ user topologies without crashing the client's browser.
+* **Transaction Volumes:** Unsupervised models batch-train nightly on distributed compute, offloading heavy processing away from live real-time scoring.
+
+### 8. Practicality & Maintenance
+Because the AI is unsupervised, it requires **zero rule maintenance**. Security teams don't need to hire engineers to write complex query languages (like Splunk SPL). The entire stack is containerized, lightweight, and continuously improves its accuracy as it ingests more daily telemetry.
+
+### 9. Cybersecurity, Compliance & Data Protection
+* **Data Protection:** Models are trained solely on *metadata* (timestamps, file IDs, event types), ensuring strict GDPR and PII compliance without inspecting raw user payload data.
+* **Access Control:** Enforces strict Role-Based Access Control (RBAC). Only authenticated SOC admins can execute session-kill commands. 
+* **Safe Implementation:** Actions are sandboxed to the active session layer, preventing accidental network-wide outages.
+
+### 10. System Architecture Diagram
+
+```mermaid
+graph TD
+    A[10,000 Enterprise Employees] -->|Generate Telemetry| B(Log Aggregator & Simulator)
+    B -->|Logins, Files, USBs| C{Behavioral AI Engine}
+    C -->|Isolation Forest| D[Risk Profiler]
+    C -->|Autoencoder NN| D
+    D -->|Real-time Socket| E[Vercel Frontend UI]
+    D -->|Topology Edges| F[NetworkX Engine]
+    F -->|Nodes/Links| E
+    E -->|Analyst Revokes Access| G[Zero Trust Policy Enforcement]
+    G -->|Kill Session| A
+```

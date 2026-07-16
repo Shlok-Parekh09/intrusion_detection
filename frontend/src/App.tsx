@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Shield, Users, Monitor, Clock, FileText, Activity,
   AlertTriangle, ShieldCheck, ShieldAlert, Cpu, Network, Lock, Unlock,
   ChevronUp, ChevronDown, Bell, TrendingUp, Eye, Search,
-  Trash2, X, ChevronRight, ToggleLeft, ToggleRight, Plus
+  Trash2, X, ChevronRight, ToggleLeft, ToggleRight, Plus, Circle
 } from 'lucide-react';
 import './index.css';
 
@@ -163,11 +163,10 @@ function App() {
       {/* ═══ SIDEBAR ═══ */}
       <aside className={`sidebar ${sidebarCollapsed ? 'sidebar--collapsed' : ''}`}>
         <div className="sidebar-logo">
-          <div className="logo-icon"><ShieldCheck size={sidebarCollapsed ? 24 : 18} /></div>
+          <div className="logo-icon"><Circle size={sidebarCollapsed ? 24 : 18} /></div>
           {!sidebarCollapsed && (
             <div className="logo-text">
               <span className="logo-name">VORTEX</span>
-              <span className="logo-sub">XPAM Security</span>
             </div>
           )}
         </div>

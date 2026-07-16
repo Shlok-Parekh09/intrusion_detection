@@ -131,21 +131,44 @@ try:
     for _, row in global_df.iterrows():
         uid = str(row['user'])
         is_red = bool(row.get('is_red_team', 0))
+        anomaly = max(row['isolation_forest'], row['oneclass_svm'], row['autoencoder'])
+        
+        # Seed red-team and high-anomaly users with realistic initial risk state from the ACTUAL dataset
+        initial_risk = 0.0
+        initial_failed = 0
+        initial_usb = 0
+        initial_files = 0
+        initial_after_hours = False
+        initial_mfa = True
+        if is_red:
+            initial_risk = random.uniform(0.6, 0.95)
+            initial_failed = random.randint(2, 8)
+            initial_usb = random.randint(1, 5)
+            initial_files = random.randint(30, 80)
+            initial_after_hours = True
+            initial_mfa = random.choice([True, False])
+        elif anomaly > 1.5:
+            initial_risk = random.uniform(0.4, 0.7)
+            initial_failed = random.randint(1, 4)
+            initial_files = random.randint(20, 50)
+        else:
+            initial_files = random.randint(2, 15)
+            initial_failed = random.randint(0, 1)
+        
         managed_users[uid] = {
             "id": uid, "name": uid, "role": random.choice(roles) if not is_red else "Insider Threat",
             "group": random.choice(groups), "department": random.choice(departments), "access_level": random.choice(access_levels),
-            "status": "active", "mfa": True, "risk_score": 0.0,
-            "login_count_today": 0, # Start at 0 for live simulation
-            "failed_logins_today": 0,
-            "files_accessed_today": 0, # Start at 0
-            "email_count_today": 0,
-            "after_hours_activity": False,
-            "usb_attempts": 0, 
+            "status": "active", "mfa": initial_mfa, "risk_score": initial_risk,
+            "login_count_today": random.randint(1, 5),
+            "failed_logins_today": initial_failed,
+            "files_accessed_today": initial_files,
+            "email_count_today": random.randint(0, 10),
+            "after_hours_activity": initial_after_hours,
+            "usb_attempts": initial_usb, 
             "last_login": time.time() - random.randint(100, 3600),
             "behavioral_baseline": {"avg_files": 15, "avg_logins": 2, "avg_hours": 8},
         }
         
-        anomaly = max(row['isolation_forest'], row['oneclass_svm'], row['autoencoder'])
         global_attrs[uid] = {
             'anomaly': anomaly,
             'red_team': is_red,
@@ -737,11 +760,12 @@ def autonomous_telemetry_simulator():
         time.sleep(1.0) # Tick every 1.0 second (one by one clearly)
         iteration += 1
         
-        # Decay stats slightly every tick to create a moving average (prevents infinite accumulation)
-        for u in managed_users.values():
-            u["files_accessed_today"] = int(u.get("files_accessed_today", 0) * 0.999)
-            u["login_count_today"] = int(u.get("login_count_today", 0) * 0.999)
-            u["failed_logins_today"] = int(u.get("failed_logins_today", 0) * 0.999)
+        # Very slow decay (every 120 ticks ~ 2 min) to prevent infinite growth but allow stats to accumulate
+        if iteration % 120 == 0:
+            for u in managed_users.values():
+                u["files_accessed_today"] = max(int(u.get("files_accessed_today", 0) * 0.95), 0)
+                u["login_count_today"] = max(int(u.get("login_count_today", 0) * 0.95), 0)
+                u["failed_logins_today"] = max(int(u.get("failed_logins_today", 0) * 0.95), 0)
             
         for s in active_sessions.values():
             if s["status"] == "active":
@@ -784,8 +808,22 @@ def autonomous_telemetry_simulator():
                 # Contextual generation based on dataset logs to flesh out the environment
                 if random.random() < 0.1:
                     ingest_cert_log(CertEvent(user_id=uid, event_type="email", action="Send", details="internal@company.com"))
-                if random.random() < 0.05:
+                if random.random() < 0.08:
                     ingest_cert_log(CertEvent(user_id=uid, event_type="logon", action="Logon", details="Workstation"))
+                
+                # Red team users do suspicious things organically
+                if is_red:
+                    if random.random() < 0.15:
+                        ingest_cert_log(CertEvent(user_id=uid, event_type="logon", action="Failed", details="Invalid credentials"))
+                    if random.random() < 0.08:
+                        ingest_cert_log(CertEvent(user_id=uid, event_type="usb", action="Connect", details="Kingston DataTraveler"))
+                    if after_hours and random.random() < 0.12:
+                        user["after_hours_activity"] = True
+                        ingest_cert_log(CertEvent(user_id=uid, event_type="file", action="Access", details="confidential_financials.xlsx"))
+                else:
+                    # Normal users occasionally fail login too (realistic)
+                    if random.random() < 0.02:
+                        ingest_cert_log(CertEvent(user_id=uid, event_type="logon", action="Failed", details="Expired password"))
             
             # --- TIME OF DAY ORGANIC SCALING ---
             num_endpoints = len(active_endpoints)
@@ -823,16 +861,20 @@ def autonomous_telemetry_simulator():
                 active_endpoints[malicious_ep]['risk_score'] = managed_users[malicious_uid]['risk_score']
                 global_attrs[malicious_uid] = {'anomaly': managed_users[malicious_uid]['risk_score'], 'red_team': True}
                 
-                # Fire the malicious event
+                # Fire the malicious event with detailed reasoning
                 bad_events = [
-                    ("usb", "Connect", "SanDisk Cruzer (Unauthorized)"),
-                    ("file", "Access", "payroll_db_dump.csv"),
-                    ("email", "Send", "external_competitor@protonmail.com"),
-                    ("logon", "Failed", "Admin account brute force")
+                    ("usb", "Connect", "SanDisk Cruzer (Unauthorized)", "DLP Policy pol-003 triggered: Unauthorized USB device detected. User attempted to exfiltrate data via removable media."),
+                    ("file", "Access", "payroll_db_dump.csv", "Behavioral AI flagged anomalous bulk access to sensitive payroll database. Risk score exceeded threshold 0.8."),
+                    ("email", "Send", "external_competitor@protonmail.com", "Cloud Exfiltration Prevention pol-007 triggered: Email with attachment sent to unverified external domain."),
+                    ("logon", "Failed", "Admin account brute force", "Identity Threat Detection pol-009 triggered: Multiple failed login attempts against privileged admin account."),
+                    ("file", "Access", "customer_pii_export.csv", "Mass File Download Heuristics pol-008 triggered: Bulk download of PII-containing files outside business hours."),
+                    ("usb", "Connect", "Unknown USB HID Device", "DLP Endpoint USB Blocking pol-003 triggered: Unregistered HID device connection attempt detected."),
                 ]
                 ev = random.choice(bad_events)
                 ingest_cert_log(CertEvent(user_id=malicious_uid, event_type=ev[0], action=ev[1], details=ev[2]))
-                _add_event(malicious_ep, f"Malicious Activity Detected: {ev[1]} {ev[2]}", "CRITICAL", ev[0])
+                _add_event(malicious_ep, f"⚠ THREAT: {ev[3]}", "CRITICAL", ev[0])
+                # Also lock the endpoint
+                active_endpoints[malicious_ep]['status'] = 'LOCKED'
 
             
             # Update Active Sessions randomly for active users

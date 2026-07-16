@@ -123,9 +123,28 @@ function App() {
       gradioFetch('get_sessions').then(d => { if (Array.isArray(d)) setSessions(d); });
       gradioFetch('get_login_trends').then(d => { if (Array.isArray(d)) setLoginTrends(d); });
       
-      // Update graph every 6 ticks (3 seconds) to allow the graph physics to slowly transition and settle
-      if (tickCount.current % 6 === 0) {
-        gradioFetch('get_graph').then(d => { if (d?.nodes) setGraphData(d); });
+      // Update graph every 10 ticks (5 seconds) to allow the graph physics to slowly transition and settle
+      if (tickCount.current % 10 === 0) {
+        gradioFetch('get_graph').then(d => { 
+          if (d?.nodes) {
+            // Merge new data into existing graph to preserve D3 node positions
+            setGraphData(prev => {
+              const existingNodeMap = new Map<string, any>();
+              for (const n of prev.nodes) {
+                existingNodeMap.set(n.id, n);
+              }
+              const mergedNodes = d.nodes.map((n: any) => {
+                const existing = existingNodeMap.get(n.id);
+                if (existing) {
+                  // Preserve x, y, vx, vy from existing node so D3 doesn't reset physics
+                  return { ...n, x: existing.x, y: existing.y, vx: existing.vx, vy: existing.vy, fx: existing.fx, fy: existing.fy };
+                }
+                return n; // New node, let D3 place it naturally
+              });
+              return { nodes: mergedNodes, links: d.links };
+            });
+          }
+        });
       }
     };
     tick();

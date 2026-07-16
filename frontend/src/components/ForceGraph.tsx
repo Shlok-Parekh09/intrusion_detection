@@ -54,6 +54,8 @@ export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGra
   const [zoom, setZoom] = useState(1.0);
   const [width, setWidth] = useState(800);
 
+  const hasInitialZoomed = useRef(false);
+
   useEffect(() => {
     if (containerRef.current) setWidth(containerRef.current.offsetWidth);
     const handleResize = () => {
@@ -63,11 +65,12 @@ export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGra
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Auto-center graph when data populates
+  // Auto-center graph when data populates initially
   useEffect(() => {
-    if (data.nodes.length > 0 && fgRef.current) {
-      // Zoom to fit the graph beautifully on first load or when it grows
+    if (data.nodes.length > 0 && fgRef.current && !hasInitialZoomed.current) {
+      // Zoom to fit the graph beautifully on first load, then let user control it
       fgRef.current.zoomToFit(500, 30);
+      hasInitialZoomed.current = true;
     }
   }, [data.nodes.length]);
 

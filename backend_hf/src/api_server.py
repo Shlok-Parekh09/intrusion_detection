@@ -39,16 +39,16 @@ managed_users = {}
 
 # Security policies
 security_policies = [
-    {"id": "pol-001", "name": "Zero Trust Endpoint Validation", "enabled": True, "scope": "All Endpoints", "enforcement": "Mandatory", "category": "Access Control", "violations": 0},
-    {"id": "pol-002", "name": "Privileged Session Recording", "enabled": True, "scope": "Admin Accounts", "enforcement": "Mandatory", "category": "Monitoring", "violations": 0},
-    {"id": "pol-003", "name": "USB Device Restriction", "enabled": True, "scope": "All Users", "enforcement": "Block", "category": "Data Protection", "violations": 3},
-    {"id": "pol-004", "name": "After-Hours Access Alert", "enabled": True, "scope": "Non-Admin Users", "enforcement": "Alert", "category": "Behavior", "violations": 2},
-    {"id": "pol-005", "name": "Multi-Factor Authentication", "enabled": True, "scope": "All Accounts", "enforcement": "Mandatory", "category": "Authentication", "violations": 1},
-    {"id": "pol-006", "name": "QPC Key Rotation (24h)", "enabled": True, "scope": "System", "enforcement": "Automated", "category": "Cryptography", "violations": 0},
-    {"id": "pol-007", "name": "Data Exfiltration Prevention", "enabled": True, "scope": "All Endpoints", "enforcement": "Block + Alert", "category": "Data Protection", "violations": 5},
-    {"id": "pol-008", "name": "Excessive File Access Detection", "enabled": True, "scope": "All Users", "enforcement": "Alert + Lock", "category": "Behavior", "violations": 4},
-    {"id": "pol-009", "name": "Failed Login Threshold (5/hr)", "enabled": True, "scope": "All Accounts", "enforcement": "Lock Account", "category": "Authentication", "violations": 2},
-    {"id": "pol-010", "name": "Privileged Escalation Monitoring", "enabled": True, "scope": "All Users", "enforcement": "Alert + Review", "category": "Access Control", "violations": 1},
+    {"id": "pol-001", "name": "Zero Trust Conditional Access", "enabled": True, "scope": "All Endpoints", "enforcement": "Mandatory", "category": "Access Control", "violations": 0},
+    {"id": "pol-002", "name": "Privileged Identity Management (PIM)", "enabled": True, "scope": "Admin Accounts", "enforcement": "Mandatory", "category": "Monitoring", "violations": 0},
+    {"id": "pol-003", "name": "DLP Endpoint USB Blocking", "enabled": True, "scope": "All Users", "enforcement": "Block", "category": "Data Protection", "violations": 3},
+    {"id": "pol-004", "name": "After-Hours Geo-Fencing", "enabled": True, "scope": "Non-Admin Users", "enforcement": "Alert", "category": "Behavior", "violations": 2},
+    {"id": "pol-005", "name": "Mandatory Phishing-Resistant MFA", "enabled": True, "scope": "All Accounts", "enforcement": "Mandatory", "category": "Authentication", "violations": 1},
+    {"id": "pol-006", "name": "QPC Quantum-Safe Key Rotation", "enabled": True, "scope": "System", "enforcement": "Automated", "category": "Cryptography", "violations": 0},
+    {"id": "pol-007", "name": "Cloud Exfiltration Prevention", "enabled": True, "scope": "All Endpoints", "enforcement": "Block + Alert", "category": "Data Protection", "violations": 5},
+    {"id": "pol-008", "name": "Mass File Download Heuristics", "enabled": True, "scope": "All Users", "enforcement": "Alert + Lock", "category": "Behavior", "violations": 4},
+    {"id": "pol-009", "name": "Identity Threat Detection (Failed Logins)", "enabled": True, "scope": "All Accounts", "enforcement": "Lock Account", "category": "Authentication", "violations": 2},
+    {"id": "pol-010", "name": "Lateral Movement AI Monitoring", "enabled": True, "scope": "All Users", "enforcement": "Alert + Review", "category": "Access Control", "violations": 1},
 ]
 
 # Active sessions tracking
@@ -627,9 +627,11 @@ def get_graph():
         G = nx.Graph()
             
         for u, f in live_graph_edges:
-            G.add_edge(u, f, type='access')
+            # Only show edges where the user is currently an active endpoint
+            if f"ep-{u}" in active_endpoints and active_endpoints[f"ep-{u}"]["status"] != "OFFLINE":
+                G.add_edge(u, f, type='access')
         
-        # Return all nodes instead of filtering
+        # Return all active nodes
         nodes = []
         for n in G.nodes():
             n_type = "user" if n in attrs else "file"
@@ -730,8 +732,10 @@ def autonomous_telemetry_simulator():
         f = str(initial_file_access.iloc[i]['file'])
         live_graph_edges.append((u, f))
     
+    iteration = 0
     while True:
         time.sleep(1.0) # Tick every 1.0 second (one by one clearly)
+        iteration += 1
         
         # Decay stats slightly every tick to create a moving average (prevents infinite accumulation)
         for u in managed_users.values():
@@ -777,14 +781,59 @@ def autonomous_telemetry_simulator():
                         "status": "SECURE",
                         "last_seen": time.time()
                     }
-                
                 # Contextual generation based on dataset logs to flesh out the environment
                 if random.random() < 0.1:
                     ingest_cert_log(CertEvent(user_id=uid, event_type="email", action="Send", details="internal@company.com"))
                 if random.random() < 0.05:
                     ingest_cert_log(CertEvent(user_id=uid, event_type="logon", action="Logon", details="Workstation"))
-                if after_hours and is_red and random.random() < 0.2:
-                    ingest_cert_log(CertEvent(user_id=uid, event_type="usb", action="Connect", details="SanDisk Cruzer"))
+            
+            # --- TIME OF DAY ORGANIC SCALING ---
+            num_endpoints = len(active_endpoints)
+            if after_hours:
+                # After hours: randomly log off users to scale down
+                if num_endpoints > 50 and random.random() < 0.2:
+                    uid_to_remove = random.choice(list(active_endpoints.keys()))
+                    active_endpoints[uid_to_remove]["status"] = "OFFLINE"
+            else:
+                # Working hours: organically grow active users
+                if num_endpoints < 2000 and random.random() < 0.2:
+                    random_uid = random.choice(list(managed_users.keys()))
+                    if f"ep-{random_uid}" not in active_endpoints:
+                        # Log them in organically
+                        ingest_cert_log(CertEvent(user_id=random_uid, event_type="logon", action="Logon", details="Workstation"))
+
+            # --- TIMED MALICIOUS INJECTION ---
+            trigger_malicious = False
+            if num_endpoints >= 500 and iteration % 60 == 0:
+                trigger_malicious = True
+            elif num_endpoints < 500 and iteration % 300 == 0:
+                trigger_malicious = True
+                
+            if trigger_malicious:
+                malicious_uid = random.choice([u for u, v in managed_users.items() if v['role'] == "Insider Threat"] or list(managed_users.keys()))
+                managed_users[malicious_uid]['role'] = "Insider Threat"
+                managed_users[malicious_uid]['risk_score'] = random.uniform(0.7, 0.99)
+                malicious_ep = f"ep-{malicious_uid}"
+                if malicious_ep not in active_endpoints:
+                    active_endpoints[malicious_ep] = {
+                        "agent_id": malicious_ep, "timestamp": time.time(), "cpu": 90, "ram": 85,
+                        "net_conns": 200, "risk_score": managed_users[malicious_uid]['risk_score'],
+                        "status": "SECURE", "last_seen": time.time()
+                    }
+                active_endpoints[malicious_ep]['risk_score'] = managed_users[malicious_uid]['risk_score']
+                global_attrs[malicious_uid] = {'anomaly': managed_users[malicious_uid]['risk_score'], 'red_team': True}
+                
+                # Fire the malicious event
+                bad_events = [
+                    ("usb", "Connect", "SanDisk Cruzer (Unauthorized)"),
+                    ("file", "Access", "payroll_db_dump.csv"),
+                    ("email", "Send", "external_competitor@protonmail.com"),
+                    ("logon", "Failed", "Admin account brute force")
+                ]
+                ev = random.choice(bad_events)
+                ingest_cert_log(CertEvent(user_id=malicious_uid, event_type=ev[0], action=ev[1], details=ev[2]))
+                _add_event(malicious_ep, f"Malicious Activity Detected: {ev[1]} {ev[2]}", "CRITICAL", ev[0])
+
             
             # Update Active Sessions randomly for active users
             ep_id = f"ep-{uid}"

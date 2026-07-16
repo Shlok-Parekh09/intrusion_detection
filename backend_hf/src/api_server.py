@@ -290,8 +290,8 @@ def ingest_cert_log(event: CertEvent):
         if random.random() < 0.05:
             _add_event(f"ep-{uid}", f"File Accessed: {file_name}", "INFO", "File System")
             
-        # Keep graph manageable (max 100 edges to prevent frontend D3 physics explosion)
-        if len(live_graph_edges) > 100:
+        # Keep graph manageable (max 250 edges to prevent frontend D3 physics explosion but keep it smooth)
+        if len(live_graph_edges) > 250:
             live_graph_edges.pop(0)
             
     elif event.event_type == "email":
@@ -688,7 +688,7 @@ def siem_policy_engine():
         for sid, s in list(active_sessions.items()):
             if s["status"] != "active": continue
             # pol-007 Data Exfiltration
-            if is_policy_enabled("pol-007") and s["bytes_transferred"] > 1000000: # 1MB limit for simulation
+            if is_policy_enabled("pol-007") and s["bytes_transferred"] > 5000000: # 5MB limit for fast simulation
                 s["status"] = "killed"
                 if s["agent_id"] in active_endpoints:
                     active_endpoints[s["agent_id"]]["status"] = "LOCKED"
@@ -708,6 +708,10 @@ def autonomous_telemetry_simulator():
             u["files_accessed_today"] = int(u.get("files_accessed_today", 0) * 0.999)
             u["login_count_today"] = int(u.get("login_count_today", 0) * 0.999)
             u["failed_logins_today"] = int(u.get("failed_logins_today", 0) * 0.999)
+            
+        for s in active_sessions.values():
+            if s["status"] == "active":
+                s["bytes_transferred"] = int(s.get("bytes_transferred", 0) * 0.9)
 
         # Play back up to 25 real file access logs per tick to create a real-time environment
         for _ in range(25):
@@ -755,11 +759,18 @@ def autonomous_telemetry_simulator():
             
             log_index += 1
             
-        # Update CPU/RAM for all endpoints to simulate live machines
+        # Update CPU/RAM for all endpoints to simulate live machines, and randomly drop endpoints to offline
         for ep_id, ep in active_endpoints.items():
             if ep["status"] != "LOCKED":
-                ep["cpu"] = max(5, min(95, ep["cpu"] + random.randint(-10, 10)))
-                ep["ram"] = max(20, min(90, ep["ram"] + random.randint(-5, 5)))
+                # Randomly fluctuate endpoints online/offline
+                if random.random() < 0.02:
+                    ep["status"] = "OFFLINE"
+                elif random.random() < 0.05 and ep["status"] == "OFFLINE":
+                    ep["status"] = "SECURE"
+                    
+                if ep["status"] != "OFFLINE":
+                    ep["cpu"] = max(5, min(95, ep["cpu"] + random.randint(-10, 10)))
+                    ep["ram"] = max(20, min(90, ep["ram"] + random.randint(-5, 5)))
                 ep["last_seen"] = time.time()
                 
                 # Link AI Behavioral Risk to Device Risk directly!

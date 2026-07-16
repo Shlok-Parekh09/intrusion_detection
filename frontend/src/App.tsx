@@ -114,8 +114,8 @@ function App() {
       gradioFetch('get_sessions').then(d => { if (Array.isArray(d)) setSessions(d); });
       gradioFetch('get_login_trends').then(d => { if (Array.isArray(d)) setLoginTrends(d); });
       
-      // Only update graph every 6 ticks (3 seconds) to prevent physics engine from constantly restarting
-      if (tickCount.current % 6 === 0) {
+      // Update graph every 2 ticks (1 second) to be more responsive without dying
+      if (tickCount.current % 2 === 0) {
         gradioFetch('get_graph').then(d => { if (d?.nodes) setGraphData(d); });
       }
     };
@@ -262,7 +262,7 @@ function PageDashboard({ endpoints, events, graphData, users, locked, criticals,
   return (<>
     {/* Stats - Using new StatCard component */}
     <div className="stats-row">
-      <StatCard icon={<Monitor size={18} />} iconClass="blue" label="Active Endpoints" value={endpoints.length} sub={<><Cpu size={11} /> QPC Encrypted</>} />
+      <StatCard icon={<Monitor size={18} />} iconClass="blue" label="Active Endpoints" value={endpoints.filter((e: any) => e.status !== 'OFFLINE').length} sub={<><Cpu size={11} /> QPC Encrypted</>} />
       <StatCard icon={<AlertTriangle size={18} />} iconClass="red" label="Active Threats" value={locked} sub={locked > 0 ? <><ChevronUp size={11} /> RBAC Lockout</> : <><ChevronDown size={11} /> Clear</>} subClass={locked > 0 ? 'up' : 'down'} />
       <StatCard icon={<Users size={18} />} iconClass="yellow" label="High-Risk Users" value={users.filter((u: any) => u.risk_score >= 0.5).length} sub={<><Eye size={11} /> Behavioral AI</>} />
       <StatCard icon={<Bell size={18} />} iconClass="red" label="Critical Alerts" value={criticals} sub={criticals > 0 ? <><ChevronUp size={11} /> Needs attention</> : <>All clear</>} subClass={criticals > 0 ? 'up' : 'neutral'} />

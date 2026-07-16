@@ -117,6 +117,7 @@ def load_dataset():
 # ═══════════════════════════════════════════════════════════════════
 
 global_df = None
+global_attrs = {}
 live_graph_edges = []
 login_trends_by_hour = {str(i).zfill(2): {"successful": 0, "failed": 0} for i in range(24)}
 
@@ -138,6 +139,14 @@ try:
             "last_login": time.time() - random.randint(100, 3600),
             "behavioral_baseline": {"avg_files": 15, "avg_logins": 2, "avg_hours": 8},
         }
+        
+        anomaly = max(row['isolation_forest'], row['oneclass_svm'], row['autoencoder'])
+        global_attrs[uid] = {
+            'anomaly': anomaly,
+            'red_team': is_red,
+            'high_risk': (anomaly > 1.5) or is_red
+        }
+        
         active_endpoints[f"ep-{uid}"] = {
             "agent_id": f"ep-{uid}",
             "timestamp": time.time(),
@@ -589,19 +598,13 @@ def get_anomalies(model: str = "isolation_forest", min_score: float = 0.0):
 @app.get("/api/graph")
 def get_graph():
     try:
-        df = global_df
-        attrs = {}
-        if df is not None:
-            for _, row in df.iterrows():
-                anomaly = max(row['isolation_forest'], row['oneclass_svm'], row['autoencoder'])
-                red_team = row['is_red_team']
-                attrs[row['user']] = {
-                    'anomaly': anomaly,
-                    'red_team': red_team,
-                    'high_risk': (anomaly > 1.5) or (red_team == 1)
-                }
-                
+        attrs = global_attrs
         G = nx.Graph()
+        
+        # Ensure all active users are in the graph even if they have no recent edges
+        for uid in managed_users:
+            G.add_node(uid)
+            
         for u, f in live_graph_edges:
             G.add_edge(u, f, type='access')
         
@@ -699,6 +702,12 @@ def autonomous_telemetry_simulator():
     """Runs continuously in the background to simulate live user behavior from ACTUAL dataset logs."""
     log_index = 0
     total_logs = len(initial_file_access) if initial_file_access is not None else 0
+    
+    # Pre-seed graph with some edges so it's not totally empty on boot
+    for i in range(min(50, total_logs)):
+        u = str(initial_file_access.iloc[i]['user'])
+        f = str(initial_file_access.iloc[i]['file'])
+        live_graph_edges.append((u, f))
     
     while True:
         time.sleep(1.0) # Tick every 1.0 second (one by one clearly)

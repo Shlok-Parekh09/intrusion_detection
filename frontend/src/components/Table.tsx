@@ -86,10 +86,15 @@ export function Table<T>({
     });
   };
 
-  // Reset to page 1 on data change
+  // Keep user on the same page during live updates, only clamp if out of bounds
   useEffect(() => {
-    setCurrentPage(1);
-  }, [data]);
+    const maxPage = Math.ceil(data.length / pageSize);
+    if (currentPage > maxPage && maxPage > 0) {
+      setCurrentPage(maxPage);
+    } else if (data.length === 0) {
+      setCurrentPage(1);
+    }
+  }, [data.length, pageSize]);
 
   // Empty state
   if (sortedData.length === 0) {
@@ -145,7 +150,7 @@ export function Table<T>({
                   const index = virtualRow.index;
                   return (
                     <tr
-                      key={virtualRow.key}
+                      key={(item as any).id || virtualRow.key}
                       className={`table__row ${onRowClick ? 'table__row--clickable' : ''}`}
                       style={{
                         transform: `translateY(${virtualRow.start - virtualizer.options.scrollMargin}px)`,
@@ -179,7 +184,7 @@ export function Table<T>({
             ) : (
               paginatedData.map((item, index) => (
                 <tr
-                  key={index}
+                  key={(item as any).id || index}
                   className={`table__row ${onRowClick ? 'table__row--clickable' : ''}`}
                   onClick={() => onRowClick?.(item, index)}
                 >

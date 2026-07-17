@@ -82,4 +82,4 @@ with gr.Blocks() as demo:
     gr.Button("cert_log").click(ingest_cert_log_adapter, inputs=[cert_uid, cert_type, cert_act, cert_det], outputs=[dummy_out], api_name="cert_log")
 
 
-demo.launch()
+demo.launch(server_name="0.0.0.0", server_port=7860)

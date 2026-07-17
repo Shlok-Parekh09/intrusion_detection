@@ -121,28 +121,34 @@ export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGra
   const nodeCanvasObject = useCallback((node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
     if (!Number.isFinite(node.x) || !Number.isFinite(node.y)) return;
 
-    const color = getNodeColor(node);
-    const r = getNodeSize();
-
-    // Draw solid node core
-    ctx.beginPath();
-    ctx.arc(node.x, node.y, r, 0, 2 * Math.PI, false);
-    ctx.fillStyle = color.fill;
-    ctx.fill();
-
-    // Always draw labels so user can see node names
-    const fontSize = Math.max(3.5, 10 / globalScale);
-    ctx.font = `600 ${fontSize}px Inter, sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    const radius = getNodeSize();
     const label = (node.label || node.id || '').substring(0, 12);
-    ctx.fillText(label, node.x, node.y + r + 2 / globalScale);
+
+    // Draw Node shape (Circle)
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI, false);
+    ctx.fillStyle = node.is_red ? '#ef4444' : (node.type === 'file' ? '#f59e0b' : '#3b82f6');
+    ctx.fill();
+    
+    // Node outline
+    ctx.lineWidth = 1.5 / globalScale; // Thinner lines when zoomed out
+    ctx.strokeStyle = '#0f172a';
+    ctx.stroke();
+
+    // Only draw text if we are reasonably zoomed in, OR if it's a critical threat
+    // This saves MASSIVE amounts of CPU and completely eliminates canvas rendering lag
+    if (globalScale > 0.8 || node.is_red) {
+      ctx.font = `${6}px Inter`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillText(label, node.x, node.y + radius + 3);
+    }
 
     // Highlight pinned node
     if (pinnedNode && pinnedNode.id === node.id) {
       ctx.beginPath();
-      ctx.arc(node.x, node.y, r * 1.8, 0, 2 * Math.PI, false);
+      ctx.arc(node.x, node.y, radius * 1.8, 0, 2 * Math.PI, false);
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
       ctx.lineWidth = 2 / globalScale;
       ctx.stroke();
@@ -224,6 +230,29 @@ export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGra
     );
   }
 
+  useEffect(() => {
+    if (fgRef.current) {
+      // Configure built-in forces for a slow, organic "discrete mathematics" graph layout
+      const charge = fgRef.current.d3Force('charge');
+      // Gentle repulsion to keep nodes comfortably apart without causing physics stuttering
+      if (charge) charge.strength(-60).distanceMax(250);
+      
+      const link = fgRef.current.d3Force('link');
+      // Standard link distance
+      if (link) link.distance(60).strength(0.8);
+      
+      // Gentle center force to keep everything from drifting infinitely
+      const center = fgRef.current.d3Force('center');
+      if (center) center.strength(0.02);
+      
+      // Disable custom forces
+      fgRef.current.d3Force('centerRed', null);
+      fgRef.current.d3Force('grid', null);
+    }
+  }, []);
+  
+  // Removed manual d3ReheatSimulation so new nodes spawn gently without boiling the physics engine
+
   return (
     <div className="force-graph-container" style={{ height }} ref={containerRef}>
       <div className="force-graph-canvas-wrapper">
@@ -242,9 +271,7 @@ export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGra
           linkDirectionalParticleSpeed={0.01}
           linkDirectionalParticleWidth={1.5}
           linkDirectionalParticleColor={() => "rgba(255,255,255,0.7)"}
-          d3VelocityDecay={0.8}
-          warmupTicks={150}
-          cooldownTicks={0}
+          d3VelocityDecay={0.85}
           onNodeHover={handleNodeHover}
           onNodeClick={handleNodeClick}
           onBackgroundClick={handleBackgroundClick}

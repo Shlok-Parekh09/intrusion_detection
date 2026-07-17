@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n \"frontend,backend\" -c \"bgBlue.bold,bgMagenta.bold\" \"vite\" \"cd .. && python -m uvicorn src.api_server:app --reload --reload-dir src --port 8000\"",
+    "dev": "concurrently -n \"frontend,backend\" -c \"bgBlue.bold,bgMagenta.bold\" \"vite\" \"cd ../backend_hf && python app.py\"",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview"

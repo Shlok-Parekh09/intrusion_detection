@@ -12,6 +12,7 @@ interface ToastProps {
   duration?: number;
   onClose: (id: string) => void;
   showProgress?: boolean;
+  onClick?: () => void;
 }
 
 const icons = {
@@ -21,7 +22,7 @@ const icons = {
   info: Info,
 };
 
-export function Toast({ id, message, variant = 'info', duration = 4000, onClose, showProgress = true }: ToastProps) {
+export function Toast({ id, message, variant = 'info', duration = 4000, onClose, showProgress = true, onClick }: ToastProps) {
   const [isExiting, setIsExiting] = useState(false);
   const [progress, setProgress] = useState(100);
 
@@ -56,8 +57,14 @@ export function Toast({ id, message, variant = 'info', duration = 4000, onClose,
         toast
         toast--${variant}
         ${isExiting ? 'toast--exiting' : ''}
+        ${onClick ? 'toast--clickable' : ''}
       `.trim()}
       role="alert"
+      onClick={() => {
+        if (onClick) onClick();
+        close();
+      }}
+      style={{ cursor: onClick ? 'pointer' : 'default' }}
     >
       <div className="toast__icon">
         <Icon size={18} />
@@ -123,11 +130,11 @@ export function ToastContainer({ toasts, removeToast }: ToastContainerProps) {
 
 // Hook for using toasts
 export function useToast() {
-  const [toasts, setToasts] = useState<Array<{ id: string; message: string; variant: ToastVariant; duration: number }>>([]);
+  const [toasts, setToasts] = useState<Array<{ id: string; message: string; variant: ToastVariant; duration: number; onClick?: () => void }>>([]);
 
-  const addToast = useCallback((message: string, variant: ToastVariant = 'info', duration = 4000) => {
+  const addToast = useCallback((message: string, variant: ToastVariant = 'info', duration = 4000, onClick?: () => void) => {
     const id = Math.random().toString(36).substr(2, 9);
-    setToasts(prev => [...prev, { id, message, variant, duration }]);
+    setToasts(prev => [...prev, { id, message, variant, duration, onClick }]);
     return id;
   }, []);
 
@@ -136,10 +143,10 @@ export function useToast() {
   }, []);
 
   const toast = {
-    success: (message: string, duration?: number) => addToast(message, 'success', duration),
-    error: (message: string, duration?: number) => addToast(message, 'error', duration),
-    warning: (message: string, duration?: number) => addToast(message, 'warning', duration),
-    info: (message: string, duration?: number) => addToast(message, 'info', duration),
+    success: (message: string, duration?: number, onClick?: () => void) => addToast(message, 'success', duration, onClick),
+    error: (message: string, duration?: number, onClick?: () => void) => addToast(message, 'error', duration, onClick),
+    warning: (message: string, duration?: number, onClick?: () => void) => addToast(message, 'warning', duration, onClick),
+    info: (message: string, duration?: number, onClick?: () => void) => addToast(message, 'info', duration, onClick),
   };
 
   return { toasts, addToast, removeToast, toast };

@@ -155,6 +155,11 @@ try:
             initial_files = random.randint(2, 15)
             initial_failed = random.randint(0, 1)
         
+        # Extract individual AI scores
+        iso_score = round(float(row.get('isolation_forest', 0)), 2)
+        svm_score = round(float(row.get('oneclass_svm', 0)), 2)
+        ae_score = round(float(row.get('autoencoder', 0)), 2)
+        
         managed_users[uid] = {
             "id": uid, "name": uid, "role": random.choice(roles) if not is_red else "Insider Threat",
             "group": random.choice(groups), "department": random.choice(departments), "access_level": random.choice(access_levels),
@@ -172,82 +177,58 @@ try:
         global_attrs[uid] = {
             'anomaly': anomaly,
             'red_team': is_red,
-            'high_risk': (anomaly > 1.5) or is_red
+            'high_risk': (anomaly > 1.5) or is_red,
+            'isolation_forest': iso_score,
+            'oneclass_svm': svm_score,
+            'autoencoder': ae_score
         }
         
-    # Pre-select exactly 30 users to be online "early birds" to simulate morning login organically
-    initial_uids = random.sample(list(managed_users.keys()), min(30, len(managed_users)))
-    for uid in initial_uids:
-        ep_id = f"ep-{uid}"
-        active_endpoints[ep_id] = {
-            "agent_id": ep_id,
-            "timestamp": time.time(),
-            "cpu": random.randint(10, 80),
-            "ram": random.randint(20, 90),
-            "net_conns": random.randint(5, 50),
-            "risk_score": managed_users[uid]["risk_score"],
-            "status": "SECURE",
-            "last_seen": time.time() - random.randint(0, 20)
-        }
-        active_sessions[ep_id] = {
-            "id": f"sess-{len(active_sessions)+1:04d}",
-            "agent_id": ep_id,
-            "started": time.time() - random.randint(60, 3600),
-            "last_activity": time.time() - random.randint(0, 60),
-            "status": "active",
-            "protocol": "QPC-AES-256",
-            "bytes_transferred": random.randint(1024, 1024000),
-        }
-        live_events.append({
-            "time": time.time() - random.randint(60, 3600),
-            "agent_id": ep_id,
-            "message": f"Successful Logon by {uid}",
-            "severity": "INFO",
-            "category": "system",
-        })
-        managed_users[uid]["login_count_today"] += 1
-        
-    print(f"Successfully loaded {len(managed_users)} users from Hugging Face. Pre-started {len(active_endpoints)} endpoints.")
+    print(f"Successfully loaded {len(managed_users)} users from Hugging Face.")
 except Exception as e:
     print(f"Failed to initialize dataset: {e}")
 
 
 def _compute_behavioral_risk(user: dict) -> float:
-    """AI-driven behavioral risk scoring."""
-    baseline = user.get("behavioral_baseline", {})
-    risk = 0.0
+    """AI-driven behavioral risk scoring that merges static model inference with real-time telemetry."""
+    uid = user.get("id")
     
-    # File access anomaly
+    # 1. Base AI Risk Score from HuggingFace dataset (Isolation Forest, SVM, Autoencoder)
+    base_ai_risk = 0.0
+    if uid in global_attrs:
+        # Scale anomaly score heavily so dataset outliers act as "Medium Risk" baseline (0.3 - 0.45).
+        # This clears the "High-Risk Users" dashboard bucket, ensuring it only populates when 
+        # actual LIVE telemetry (failed logins, file access) pushes them over the 0.5 edge!
+        raw_anomaly = global_attrs[uid].get('anomaly', 0)
+        base_ai_risk = min(raw_anomaly / 5.0, 0.45) 
+        
+        # If the user is flagged as a known red-team threat
+        if global_attrs[uid].get('red_team', False):
+            base_ai_risk = max(base_ai_risk, 0.90)
+            
+    risk = base_ai_risk
+    baseline = user.get("behavioral_baseline", {})
+    
+    # 2. Real-time Telemetry Multipliers (Dynamic adjustments)
     avg_files = baseline.get("avg_files", 20)
     if avg_files > 0:
-        file_ratio = user["files_accessed_today"] / avg_files
-        if file_ratio > 3: risk += 0.3
-        elif file_ratio > 2: risk += 0.15
-        elif file_ratio > 1.5: risk += 0.05
+        file_ratio = user.get("files_accessed_today", 0) / avg_files
+        if file_ratio > 3: risk += 0.2
+        elif file_ratio > 1.5: risk += 0.1
     
-    # Login anomaly
     avg_logins = baseline.get("avg_logins", 4)
     if avg_logins > 0:
-        login_ratio = user["login_count_today"] / avg_logins
-        if login_ratio > 3: risk += 0.2
-        elif login_ratio > 2: risk += 0.1
+        login_ratio = user.get("login_count_today", 0) / avg_logins
+        if login_ratio > 3: risk += 0.15
+        
+    failed = user.get("failed_logins_today", 0)
+    if failed >= 5: risk += 0.3
+    elif failed >= 2: risk += 0.1
     
-    # Failed logins
-    if user["failed_logins_today"] >= 5: risk += 0.3
-    elif user["failed_logins_today"] >= 3: risk += 0.15
-    elif user["failed_logins_today"] >= 1: risk += 0.05
+    if user.get("after_hours_activity", False): risk += 0.15
+    if user.get("usb_attempts", 0) > 0: risk += 0.15
+    if not user.get("mfa", True): risk += 0.05
     
-    # After hours
-    if user["after_hours_activity"]: risk += 0.15
-    
-    # USB attempts
-    if user["usb_attempts"] > 0: risk += 0.1 * user["usb_attempts"]
-    
-    # No MFA is risky
-    if not user["mfa"]: risk += 0.1
-    
-    # Privileged accounts get extra scrutiny
-    if user["access_level"] == "Privileged": risk *= 1.2
+    if user.get("access_level") == "Privileged": risk *= 1.15
     
     return min(round(risk, 2), 1.0)
 
@@ -347,8 +328,8 @@ def ingest_cert_log(event: CertEvent):
         if random.random() < 0.05:
             _add_event(f"ep-{uid}", f"File Accessed: {file_name}", "INFO", "File System")
             
-        # Keep graph manageable (max 250 edges to prevent frontend D3 physics explosion but keep it smooth)
-        if len(live_graph_edges) > 250:
+        # Keep graph manageable (max 50 edges to prevent frontend D3 physics explosion but keep it smooth)
+        if len(live_graph_edges) > 50:
             live_graph_edges.pop(0)
             
     elif event.event_type == "email":
@@ -416,27 +397,37 @@ def get_login_trends():
         })
     return trends
 
+def get_safe_values(d):
+    for _ in range(10):
+        try:
+            return list(d.values())
+        except RuntimeError:
+            pass
+    return []
+
 @app.get("/api/v1/dashboard-state")
 def get_dashboard_state():
     """Aggregated endpoint to prevent 429 Rate Limits by serving everything in 1 request."""
     # 1. Endpoints
     now = time.time()
-    active_eps = [ep for ep in active_endpoints.values() if now - ep["last_seen"] < 30]
+    active_eps = [ep for ep in get_safe_values(active_endpoints) if now - ep["last_seen"] < 30]
     
     # 2. Events
     filtered_events = sorted(live_events, key=lambda x: x["time"], reverse=True)[:50]
     
-    # 3. Users
+    # 3. Users (Only Active)
+    active_uids = {ep["agent_id"].replace("ep-", "") for ep in active_eps}
     users_list = []
-    for uid, u in managed_users.items():
-        u_copy = dict(u)
-        u_copy["risk_score"] = _compute_behavioral_risk(u)
-        users_list.append(u_copy)
+    for u in get_safe_values(managed_users):
+        if u["id"] in active_uids:
+            u_copy = dict(u)
+            u_copy["risk_score"] = _compute_behavioral_risk(u)
+            users_list.append(u_copy)
     users_list = sorted(users_list, key=lambda x: x["risk_score"], reverse=True)
     
     # 4. Sessions
     sessions_list = []
-    for sid, s in active_sessions.items():
+    for s in get_safe_values(active_sessions):
         s_copy = dict(s)
         s_copy["duration_seconds"] = int(now - s["started"])
         s_copy["idle_seconds"] = int(now - s["last_activity"])
@@ -618,7 +609,7 @@ def delete_policy(policy_id: str):
 def get_sessions():
     now = time.time()
     sessions = []
-    for sid, s in active_sessions.items():
+    for s in get_safe_values(active_sessions):
         s_copy = dict(s)
         s_copy["duration_seconds"] = int(now - s["started"])
         s_copy["idle_seconds"] = int(now - s["last_activity"])
@@ -642,10 +633,17 @@ def kill_session(agent_id: str):
 
 @app.get("/api/v1/analytics/risk-summary")
 def risk_summary():
-    """Get risk distribution across all users."""
+    """Get risk distribution across active users."""
+    now = time.time()
+    active_uids = {ep["agent_id"].replace("ep-", "") for ep in get_safe_values(active_endpoints) if now - ep.get("last_seen", 0) < 30}
+    
     users = []
     risk_levels = {"critical": 0, "high": 0, "medium": 0, "low": 0}
-    for uid, u in managed_users.items():
+    for u in get_safe_values(managed_users):
+        uid = u["id"]
+        if uid not in active_uids:
+            continue
+            
         risk = _compute_behavioral_risk(u)
         if risk >= 0.8: risk_levels["critical"] += 1
         elif risk >= 0.5: risk_levels["high"] += 1
@@ -656,7 +654,7 @@ def risk_summary():
     return {
         "distribution": risk_levels,
         "users": sorted(users, key=lambda x: x["risk"], reverse=True),
-        "total_users": len(managed_users),
+        "total_users": len(active_uids),
         "total_threats": risk_levels["critical"] + risk_levels["high"],
     }
 
@@ -827,15 +825,20 @@ def autonomous_telemetry_simulator():
     log_index = 0
     total_logs = len(initial_file_access) if initial_file_access is not None else 0
     
-    # Pre-seed graph with some edges so it's not totally empty on boot
-    for i in range(min(50, total_logs)):
-        u = str(initial_file_access.iloc[i]['user'])
-        f = str(initial_file_access.iloc[i]['file'])
-        live_graph_edges.append((u, f))
-    
     iteration = 0
     while True:
-        time.sleep(0.2) # FAST Tick every 0.2 second (real-time active feel)
+        if log_index >= total_logs - 1:
+            log_index = 0
+            
+        current_row = initial_file_access.iloc[log_index]
+        next_row = initial_file_access.iloc[log_index + 1]
+        
+        time_diff = (next_row['access_time'] - current_row['access_time']).total_seconds()
+        
+        # 1hr = 1s, no fast forward
+        wait_time = max(0.01, time_diff / 3600.0)
+        time.sleep(wait_time)
+        
         iteration += 1
         
         # Very slow decay (every 120 ticks) to prevent infinite growth but allow stats to accumulate
@@ -849,26 +852,37 @@ def autonomous_telemetry_simulator():
             if s["status"] == "active":
                 s["bytes_transferred"] = int(s.get("bytes_transferred", 0) * 0.9)
 
-        # Play back 1 real file access log per tick to create a clear one-by-one real-time environment
-        for _ in range(1):
-            if log_index >= total_logs: 
-                log_index = 0 # loop dataset if we reach the end
-                
-            row = initial_file_access.iloc[log_index]
-            uid = str(row['user'])
-            filename = str(row['file'])
-            access_time = row['access_time'] # This gives us a real timestamp
+        # Play back 1 real file access log per tick
+        row = initial_file_access.iloc[log_index]
+        uid = str(row['user'])
+        filename = str(row['file'])
+        access_time = row['access_time'] # This gives us a real timestamp
+        
+        # Extract hour from real access time
+        hour = access_time.hour
+        after_hours = hour < 8 or hour >= 18
+        
+        user = managed_users.get(uid)
+        if user:
+            # -----------------
+            # STRICT RBAC CHECK
+            # -----------------
+            access_level = user.get("access_level", "Standard")
+            denied = False
+            lower_filename = filename.lower()
             
-            # Extract hour from real access time
-            hour = access_time.hour
-            after_hours = hour < 8 or hour >= 18
-            
-            # Fire real file log
-            ingest_cert_log(CertEvent(user_id=uid, event_type="file", action="Access", details=filename))
-            
-            user = managed_users.get(uid)
-            if user:
-                is_red = user['role'] == "Insider Threat"
+            if access_level == "None":
+                denied = True
+            elif access_level in ["Restricted", "Minimal", "Limited"]:
+                if lower_filename.endswith(".exe") or lower_filename.endswith(".dll") or "confidential" in lower_filename or "payroll" in lower_filename:
+                    denied = True
+                    
+            if denied:
+                _add_event("SYSTEM", f"RBAC Lockout: {uid} attempted to access {filename} but access level is {access_level}", "CRITICAL", "access_control")
+                # Do NOT process the rest of the log
+            else:
+                # Fire real file log
+                ingest_cert_log(CertEvent(user_id=uid, event_type="file", action="Access", details=filename))
                 
                 # Make sure the user is marked as "online" in endpoints if they just did something
                 ep_id = f"ep-{uid}"
@@ -883,138 +897,93 @@ def autonomous_telemetry_simulator():
                         "status": "SECURE",
                         "last_seen": time.time()
                     }
-                # Contextual generation based on dataset logs to flesh out the environment
-                if random.random() < 0.1:
-                    ingest_cert_log(CertEvent(user_id=uid, event_type="email", action="Send", details="internal@company.com"))
-                if random.random() < 0.08:
-                    ingest_cert_log(CertEvent(user_id=uid, event_type="logon", action="Logon", details="Workstation"))
-                
-                # Red team users do suspicious things organically
-                if is_red:
-                    if random.random() < 0.15:
-                        ingest_cert_log(CertEvent(user_id=uid, event_type="logon", action="Failed", details="Invalid credentials"))
-                    if random.random() < 0.08:
-                        ingest_cert_log(CertEvent(user_id=uid, event_type="usb", action="Connect", details="Kingston DataTraveler"))
-                    if after_hours and random.random() < 0.12:
-                        user["after_hours_activity"] = True
-                        ingest_cert_log(CertEvent(user_id=uid, event_type="file", action="Access", details="confidential_financials.xlsx"))
+                    # Synthetic logon to drive the login_trends graph!
+                    if random.random() < 0.95:
+                        ingest_cert_log(CertEvent(user_id=uid, event_type="logon", action="Logon", details="Workstation"))
+                    else:
+                        ingest_cert_log(CertEvent(user_id=uid, event_type="logon", action="Failed", details="Invalid Password"))
                 else:
-                    # Normal users occasionally fail login too (realistic)
-                    if random.random() < 0.02:
-                        ingest_cert_log(CertEvent(user_id=uid, event_type="logon", action="Failed", details="Expired password"))
-            
-            # --- TIME OF DAY ORGANIC SCALING ---
-            num_endpoints = len(active_endpoints)
-            if after_hours:
-                # After hours: randomly log off users to scale down
-                if num_endpoints > 20 and random.random() < 0.1:
-                    uid_to_remove = random.choice(list(active_endpoints.keys()))
-                    active_endpoints[uid_to_remove]["status"] = "OFFLINE"
-            else:
-                # Working hours: organically grow active users
-                if num_endpoints < 2000 and random.random() < 0.2:
-                    random_uid = random.choice(list(managed_users.keys()))
-                    if f"ep-{random_uid}" not in active_endpoints:
-                        # Log them in organically
-                        ingest_cert_log(CertEvent(user_id=random_uid, event_type="logon", action="Logon", details="Workstation"))
-            
-            # --- ORGANIC NEW USER ONBOARDING ---
-            if iteration % 200 == 0 and random.random() < 0.5:
-                # Simulate a new hire or guest account being created
-                new_uid = f"U{random.randint(9000, 9999)}"
-                if new_uid not in managed_users:
-                    managed_users[new_uid] = {
-                        "id": new_uid,
-                        "name": f"New Hire {new_uid}",
-                        "role": random.choice(["Engineer", "Analyst", "Contractor"]),
-                        "department": random.choice(["Engineering", "Sales", "HR"]),
-                        "access_level": random.choice(["Minimal", "Standard"]),
+                    active_endpoints[ep_id]["last_seen"] = time.time()
+                    active_endpoints[ep_id]["status"] = "SECURE"
+                    
+                # -----------------
+                # INSIDER THREAT (every 120 seconds)
+                # -----------------
+                global last_malicious_time
+                if 'last_malicious_time' not in globals():
+                    globals()['last_malicious_time'] = time.time()
+                    
+                if time.time() - globals()['last_malicious_time'] > 120:
+                    globals()['last_malicious_time'] = time.time()
+                    malicious_uid = random.choice([u for u, v in managed_users.items() if v['role'] == "Insider Threat"] or list(managed_users.keys()))
+                    managed_users[malicious_uid]['role'] = "Insider Threat"
+                    managed_users[malicious_uid]['risk_score'] = random.uniform(0.7, 0.99)
+                    
+                    if malicious_uid in global_attrs:
+                        global_attrs[malicious_uid]['red_team'] = True
+                        global_attrs[malicious_uid]['anomaly'] = max(1.0, global_attrs[malicious_uid].get('anomaly', 0))
+                    else:
+                        global_attrs[malicious_uid] = {'anomaly': 1.0, 'red_team': True, 'high_risk': True}
+                        
+                    malicious_ep = f"ep-{malicious_uid}"
+                    
+                    if malicious_ep not in active_endpoints:
+                        active_endpoints[malicious_ep] = {
+                            "agent_id": malicious_ep, "timestamp": time.time(), "cpu": 90, "ram": 85,
+                            "net_conns": 200, "risk_score": managed_users[malicious_uid]['risk_score'],
+                            "status": "SECURE", "last_seen": time.time()
+                        }
+                    active_endpoints[malicious_ep]['risk_score'] = managed_users[malicious_uid]['risk_score']
+                    
+                    # Fire the malicious event with detailed reasoning
+                    bad_events = [
+                        ("usb", "Connect", "SanDisk Cruzer (Unauthorized)", "DLP Policy pol-003 triggered: Unauthorized USB device detected. User attempted to exfiltrate data via removable media."),
+                        ("file", "Access", "payroll_db_dump.csv", "Behavioral AI flagged anomalous bulk access to sensitive payroll database. Risk score exceeded threshold 0.8."),
+                        ("email", "Send", "external_competitor@protonmail.com", "Cloud Exfiltration Prevention pol-007 triggered: Email with attachment sent to unverified external domain."),
+                        ("logon", "Failed", "Admin account brute force", "Identity Threat Detection pol-009 triggered: Multiple failed login attempts against privileged admin account."),
+                        ("file", "Access", "customer_pii_export.csv", "Mass File Download Heuristics pol-008 triggered: Bulk download of PII-containing files outside business hours."),
+                        ("usb", "Connect", "Unknown USB HID Device", "DLP Endpoint USB Blocking pol-003 triggered: Unregistered HID device connection attempt detected."),
+                    ]
+                    ev = random.choice(bad_events)
+                    ingest_cert_log(CertEvent(user_id=malicious_uid, event_type=ev[0], action=ev[1], details=ev[2]))
+                    _add_event(malicious_ep, f"⚠ THREAT: {ev[3]}", "CRITICAL", ev[0])
+                    # Lock the endpoint
+                    active_endpoints[malicious_ep]['status'] = 'LOCKED'
+                    
+                # Update Active Sessions
+                if ep_id not in active_sessions:
+                    active_sessions[ep_id] = {
+                        "id": f"sess-{len(active_sessions)+1:04d}",
+                        "agent_id": ep_id,
+                        "started": time.time(),
+                        "last_activity": time.time(),
                         "status": "active",
-                        "mfa": True,
-                        "files_accessed_today": 0,
-                        "login_count_today": 1,
-                        "failed_logins_today": 0,
-                        "usb_attempts": 0,
-                        "after_hours_activity": False,
-                        "behavioral_baseline": {"avg_files": random.randint(5, 20), "avg_logins": random.randint(1, 3)},
-                        "last_login": time.time(),
-                        "risk_score": 0.05
+                        "protocol": "QPC-AES-256",
+                        "bytes_transferred": 0,
                     }
-                    _add_event("SYSTEM", f"New user provisioned: {new_uid}", "INFO", "Identity")
-                    # Bring them online
-                    ingest_cert_log(CertEvent(user_id=new_uid, event_type="logon", action="Logon", details="Workstation"))
-
-            # --- TIMED MALICIOUS INJECTION ---
-            trigger_malicious = False
-            if num_endpoints >= 500 and iteration % 60 == 0:
-                trigger_malicious = True
-            elif num_endpoints < 500 and iteration % 300 == 0:
-                trigger_malicious = True
-                
-            if trigger_malicious:
-                malicious_uid = random.choice([u for u, v in managed_users.items() if v['role'] == "Insider Threat"] or list(managed_users.keys()))
-                managed_users[malicious_uid]['role'] = "Insider Threat"
-                managed_users[malicious_uid]['risk_score'] = random.uniform(0.7, 0.99)
-                malicious_ep = f"ep-{malicious_uid}"
-                if malicious_ep not in active_endpoints:
-                    active_endpoints[malicious_ep] = {
-                        "agent_id": malicious_ep, "timestamp": time.time(), "cpu": 90, "ram": 85,
-                        "net_conns": 200, "risk_score": managed_users[malicious_uid]['risk_score'],
-                        "status": "SECURE", "last_seen": time.time()
-                    }
-                active_endpoints[malicious_ep]['risk_score'] = managed_users[malicious_uid]['risk_score']
-                global_attrs[malicious_uid] = {'anomaly': managed_users[malicious_uid]['risk_score'], 'red_team': True}
-                
-                # Fire the malicious event with detailed reasoning
-                bad_events = [
-                    ("usb", "Connect", "SanDisk Cruzer (Unauthorized)", "DLP Policy pol-003 triggered: Unauthorized USB device detected. User attempted to exfiltrate data via removable media."),
-                    ("file", "Access", "payroll_db_dump.csv", "Behavioral AI flagged anomalous bulk access to sensitive payroll database. Risk score exceeded threshold 0.8."),
-                    ("email", "Send", "external_competitor@protonmail.com", "Cloud Exfiltration Prevention pol-007 triggered: Email with attachment sent to unverified external domain."),
-                    ("logon", "Failed", "Admin account brute force", "Identity Threat Detection pol-009 triggered: Multiple failed login attempts against privileged admin account."),
-                    ("file", "Access", "customer_pii_export.csv", "Mass File Download Heuristics pol-008 triggered: Bulk download of PII-containing files outside business hours."),
-                    ("usb", "Connect", "Unknown USB HID Device", "DLP Endpoint USB Blocking pol-003 triggered: Unregistered HID device connection attempt detected."),
-                ]
-                ev = random.choice(bad_events)
-                ingest_cert_log(CertEvent(user_id=malicious_uid, event_type=ev[0], action=ev[1], details=ev[2]))
-                _add_event(malicious_ep, f"⚠ THREAT: {ev[3]}", "CRITICAL", ev[0])
-                # Also lock the endpoint
-                active_endpoints[malicious_ep]['status'] = 'LOCKED'
-
+                active_sessions[ep_id]["last_activity"] = time.time()
+                active_sessions[ep_id]["bytes_transferred"] += random.randint(1024, 65536)
             
-            # Update Active Sessions randomly for active users
-            ep_id = f"ep-{uid}"
-            if ep_id not in active_sessions:
-                active_sessions[ep_id] = {
-                    "id": f"sess-{len(active_sessions)+1:04d}",
-                    "agent_id": ep_id,
-                    "started": time.time(),
-                    "last_activity": time.time(),
-                    "status": "active",
-                    "protocol": "QPC-AES-256",
-                    "bytes_transferred": 0,
-                }
-            active_sessions[ep_id]["last_activity"] = time.time()
-            active_sessions[ep_id]["bytes_transferred"] += random.randint(1024, 65536)
+        log_index += 1
             
-            log_index += 1
-            
-        # Update CPU/RAM for all endpoints to simulate live machines, and randomly drop endpoints to offline
-        for ep_id, ep in active_endpoints.items():
+        # Update CPU/RAM for all endpoints to simulate live machines, and drop inactive ones
+        now_time = time.time()
+        for ep_id, ep in list(active_endpoints.items()):
             if ep["status"] != "LOCKED":
-                # Randomly fluctuate endpoints online/offline
-                if random.random() < 0.005: # reduced offline chance due to faster ticks
+                if now_time - ep["last_seen"] > 15.0: # Increased to 15 real seconds to prevent bulk dropoffs during log gaps
                     ep["status"] = "OFFLINE"
-                elif random.random() < 0.02 and ep["status"] == "OFFLINE":
+                    ep["cpu"] = 0
+                    ep["ram"] = 0
+                    ep["net_conns"] = 0
+                else:
                     ep["status"] = "SECURE"
                     
                 if ep["status"] != "OFFLINE":
                     # Aggressive fluctuation for real-time feel
                     ep["cpu"] = max(5, min(95, ep["cpu"] + random.randint(-25, 25)))
-                    ep["ram"] = max(20, min(90, ep["ram"] + random.randint(-15, 15)))
-                    ep["net_conns"] = max(2, min(500, ep["net_conns"] + random.randint(-10, 20)))
-                ep["last_seen"] = time.time()
+                    ep["ram"] = max(10, min(95, ep["ram"] + random.randint(-15, 15)))
+                    ep["net_conns"] = max(0, ep["net_conns"] + random.randint(-10, 20))
                 
-                # Link AI Behavioral Risk to Device Risk directly!
                 uid = ep_id.replace("ep-", "")
                 if uid in managed_users:
                     ep["risk_score"] = managed_users[uid]["risk_score"]

@@ -17,7 +17,7 @@ let gradioClient: any = null;
 const getClient = async () => {
   if (!gradioClient) {
     const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const backendUrl = import.meta.env.VITE_BACKEND_URL || (isLocal ? "http://127.0.0.1:8000/" : "https://shlok0829-vortex-siem-backend.hf.space/");
+    const backendUrl = import.meta.env.VITE_BACKEND_URL || (isLocal ? "http://127.0.0.1:7860/" : "https://shlok0829-vortex-siem-backend.hf.space/");
     gradioClient = await Client.connect(backendUrl);
   }
   return gradioClient;
@@ -59,35 +59,51 @@ function riskLabel(r: number) { return r >= 0.8 ? 'Critical' : r >= 0.5 ? 'High'
 function riskBadge(r: number) { return r >= 0.8 ? 'badge-danger' : r >= 0.5 ? 'badge-warning' : r >= 0.3 ? 'badge-info' : 'badge-success'; }
 function statusBadge(s: string) { return s === 'active' ? 'badge-success' : s === 'locked' ? 'badge-danger' : s === 'under_investigation' ? 'badge-warning' : s === 'revoked' ? 'badge-danger' : 'badge-neutral'; }
 
-const MOCK_INITIAL_STATE = {
-  endpoints: [
-    { id: 'ep-001', hostname: 'DESKTOP-DEV1', status: 'SECURE', last_seen: Date.now() / 1000 - 5 },
-    { id: 'ep-002', hostname: 'DESKTOP-HR2', status: 'SECURE', last_seen: Date.now() / 1000 - 10 }
-  ],
-  events: [
-    { time: Date.now() / 1000 - 10, category: 'system', severity: 'INFO', message: 'System startup initiated' }
-  ],
-  users: [
-    { id: 'admin_sys', role: 'System Admin', department: 'IT', risk_score: 0.1, files_accessed_today: 12, login_count_today: 1 },
-    { id: 'dev_ops1', role: 'DevOps Engineer', department: 'Engineering', risk_score: 0.15, files_accessed_today: 45, login_count_today: 2 }
-  ],
-  policies: [
-    { id: 'pol-001', name: 'USB Mass Storage Block', enabled: true, scope: 'Global', enforced_count: 0 },
-    { id: 'pol-002', name: 'After-hours Login Restriction', enabled: false, scope: 'Global', enforced_count: 0 }
-  ],
-  sessions: [
-    { id: 'sess-001', agent_id: 'ep-001', status: 'active', protocol: 'QPC-AES-256', duration_seconds: 300, idle_seconds: 5 }
-  ],
-  graphData: {
-    nodes: [
-      { id: 'admin_sys', label: 'admin_sys', type: 'user', risk: 0.1 },
-      { id: 'sys_config.json', label: 'sys_config.json', type: 'file', risk: 0 }
-    ],
-    links: [
-      { source: 'admin_sys', target: 'sys_config.json' }
-    ]
+const generateMockState = () => {
+  const users = Array.from({length: 40}, (_, i) => ({
+    id: `u${i+1000}`, name: `User ${i}`, role: ['Software Engineer', 'Data Scientist', 'IT Admin', 'HR Manager'][Math.floor(Math.random()*4)], department: ['Engineering', 'IT', 'HR'][Math.floor(Math.random()*3)], risk_score: Math.random() * 0.2, files_accessed_today: Math.floor(Math.random()*50), login_count_today: 1, access_level: 'Standard', status: 'active', mfa: true, failed_logins_today: 0
+  }));
+  const endpoints = Array.from({length: 35}, (_, i) => ({
+    id: `ep-${i}`, agent_id: `ep-${i}`, status: 'SECURE', last_seen: Date.now() / 1000 - Math.random()*10, cpu: 20 + Math.random()*40, ram: 30 + Math.random()*40, net_conns: 10 + Math.random()*50, risk_score: Math.random() * 0.2
+  }));
+  const events = Array.from({length: 20}, (_, i) => ({
+    time: Date.now() / 1000 - i * 60, category: ['system', 'file', 'network'][Math.floor(Math.random()*3)], severity: 'INFO', message: `Routine telemetry check ${i}`
+  }));
+  
+  const nodes: any[] = [];
+  const links: any[] = [];
+  
+  for(let i=0; i<40; i++) {
+    const isUser = Math.random() > 0.4;
+    const id = isUser ? users[Math.floor(Math.random()*users.length)].id : `file_${Math.floor(Math.random()*100)}.txt`;
+    if (!nodes.find(n => n.id === id)) {
+      nodes.push({ id, label: id, type: isUser ? 'user' : 'file', risk: Math.random() * 0.2, is_red: false });
+    }
   }
+  for(let i=0; i<35; i++) {
+    const s = nodes[Math.floor(Math.random()*nodes.length)].id;
+    const t = nodes[Math.floor(Math.random()*nodes.length)].id;
+    if (s !== t) links.push({ source: s, target: t });
+  }
+
+  return {
+    endpoints,
+    events,
+    users,
+    policies: [
+      { id: 'pol-001', name: 'USB Mass Storage Block', category: 'DLP', enabled: true, scope: 'Global', enforcement: 'Block', enforced_count: 0 },
+      { id: 'pol-002', name: 'After-hours Login Restriction', category: 'IAM', enabled: true, scope: 'Global', enforcement: 'Alert', enforced_count: 0 },
+      { id: 'pol-003', name: 'Mass Download Prevention', category: 'DLP', enabled: true, scope: 'Global', enforcement: 'Block', enforced_count: 0 }
+    ],
+    sessions: [
+      { id: 'sess-001', agent_id: 'ep-0', status: 'active', protocol: 'QPC-AES-256', duration_seconds: 300, idle_seconds: 5, bytes_transferred: 500 }
+    ],
+    graphData: { nodes, links },
+    trends: []
+  };
 };
+
+const MOCK_INITIAL_STATE = generateMockState();
 
 function App() {
   const [page, setPage] = useState<NavPage>('dashboard');
@@ -101,10 +117,12 @@ function App() {
   const [clock, setClock] = useState(new Date());
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isConnecting, setIsConnecting] = useState(true);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const tickCount = useRef(0);
+  const lastEventTime = useRef<number>(0);
 
   // Toast hook
-  const { toasts, removeToast } = useToast();
+  const { toasts, removeToast, toast } = useToast();
 
   // Command palette
   const commandItems = [
@@ -147,6 +165,27 @@ function App() {
           setSessions(state.sessions);
           setLoginTrends(state.trends);
           
+          if (lastEventTime.current === 0 && state.events.length > 0) {
+            lastEventTime.current = Math.max(...state.events.map((e: any) => e.time));
+          } else if (state.events.length > 0) {
+            const newEvents = state.events.filter((e: any) => e.time > lastEventTime.current);
+            if (newEvents.length > 0) {
+              lastEventTime.current = Math.max(...state.events.map((e: any) => e.time));
+              newEvents.forEach((e: any) => {
+                if (e.severity === 'CRITICAL') {
+                  const match = e.message.match(/user (u\d+)/i) || e.message.match(/(u\d+)/i);
+                  const uid = match ? match[1] : (e.agent_id ? e.agent_id.replace('ep-', '') : null);
+                  toast.error(`CRITICAL THREAT: ${e.message}`, 5000, () => {
+                    if (uid) {
+                      setPage('users');
+                      setSelectedUserId(uid);
+                    }
+                  });
+                }
+              });
+            }
+          }
+          
           if (state.graph && state.graph.nodes) {
             setGraphData((prev: any) => {
               const existingNodeMap = new Map<string, any>();
@@ -157,15 +196,48 @@ function App() {
                 const existing = existingNodeMap.get(n.id);
                 if (existing) {
                   // Mutate existing object so D3 maintains the exact object reference
-                  // This prevents the physics engine from resetting and scrambling the graph
                   existing.risk = n.risk;
                   existing.is_red = n.is_red;
                   existing.type = n.type;
                   return existing; 
                 }
-                return { ...n };
+                
+                // Spawn logic based on threat level for best visual effect
+                if (n.is_red) {
+                  // Spawn red nodes directly in the center of the viewport
+                  return { 
+                    ...n, 
+                    x: (Math.random() * 50) - 25, 
+                    y: (Math.random() * 50) - 25 
+                  };
+                } else {
+                  // Spawn normal nodes far away in a ring, letting them drift into view
+                  const angle = Math.random() * Math.PI * 2;
+                  const radius = 600 + Math.random() * 400; // Between 600 and 1000 units away
+                  return { 
+                    ...n, 
+                    x: Math.cos(angle) * radius, 
+                    y: Math.sin(angle) * radius 
+                  };
+                }
               });
-              return { nodes: mergedNodes, links: state.graph.links };
+              const existingLinkMap = new Map<string, any>();
+              for (const l of (prev?.links || [])) {
+                const srcId = typeof l.source === 'object' ? l.source.id : l.source;
+                const tgtId = typeof l.target === 'object' ? l.target.id : l.target;
+                existingLinkMap.set(`${srcId}-${tgtId}`, l);
+              }
+              
+              const mergedLinks = state.graph.links.map((l: any) => {
+                const id = `${l.source}-${l.target}`;
+                const existing = existingLinkMap.get(id);
+                if (existing) {
+                  return existing;
+                }
+                return { ...l };
+              });
+              
+              return { nodes: mergedNodes, links: mergedLinks };
             });
           }
         }
@@ -175,16 +247,20 @@ function App() {
     };
     tick();
     
-    // Poll every 500ms
-    const iv = setInterval(tick, 500);
+    // Poll every 2000ms to reduce UI flicker/glitches on dropdowns
+    const iv = setInterval(tick, 2000);
     return () => clearInterval(iv);
   }, []);
 
   // API actions
   const userAction = async (uid: string, action: string, reason?: string) => {
     await gradioFetch('user_action', [uid, action, reason || '']);
-    gradioFetch('get_users').then(d => { if (Array.isArray(d)) setUsers(d); });
-    gradioFetch('get_events').then(d => { if (Array.isArray(d)) setEvents(d); });
+    const [uData, eData] = await Promise.all([
+      gradioFetch('get_users'),
+      gradioFetch('get_events')
+    ]);
+    if (Array.isArray(uData)) setUsers(uData);
+    if (Array.isArray(eData)) setEvents(eData);
   };
 
   const togglePolicy = async (pid: string, enabled: boolean) => {
@@ -305,7 +381,7 @@ function App() {
         <div className="dashboard-content">
           <ErrorBoundary name="PageContent">
             {page === 'dashboard' && <PageDashboard endpoints={endpoints} events={events} graphData={graphData} users={users} locked={locked} criticals={criticals} loginTrends={loginTrends} />}
-            {page === 'users' && <PageUsers users={users} userAction={userAction} />}
+            {page === 'users' && <PageUsers users={users} userAction={userAction} initialSelected={selectedUserId} />}
             {page === 'policies' && <PagePolicies policies={policies} togglePolicy={togglePolicy} deletePolicy={deletePolicy} />}
             {page === 'devices' && <PageDevices endpoints={endpoints} />}
             {page === 'sessions' && <PageSessions sessions={sessions} killSession={killSession} />}
@@ -435,8 +511,8 @@ function PageDashboard({ endpoints, events, graphData, users, locked, criticals,
 // ═══════════════════════════════════════════════════════════════════
 // USERS PAGE
 // ═══════════════════════════════════════════════════════════════════
-function PageUsers({ users, userAction }: { users: ManagedUser[]; userAction?: (uid: string, action: string, reason?: string) => void }) {
-  const [selected, setSelected] = useState<string | null>(null);
+function PageUsers({ users, userAction, initialSelected }: { users: ManagedUser[]; userAction?: (uid: string, action: string, reason?: string) => Promise<void>; initialSelected?: string | null }) {
+  const [selected, setSelected] = useState<string | null>(initialSelected || null);
   const [filter, setFilter] = useState('');
   const [behaviorData, setBehaviorData] = useState<any>(null);
 
@@ -453,6 +529,22 @@ function PageUsers({ users, userAction }: { users: ManagedUser[]; userAction?: (
       setBehaviorData(d);
     } catch { setBehaviorData(null); }
   };
+  
+  // Reload behavior when initialSelected changes (e.g. from clicking a Toast)
+  useEffect(() => {
+    if (initialSelected) {
+      loadBehavior(initialSelected);
+    }
+  }, [initialSelected]);
+  
+  const handleUserAction = async (uid: string, action: string, reason?: string) => {
+    if (userAction) {
+      await userAction(uid, action, reason);
+      if (selected === uid) {
+        await loadBehavior(uid);
+      }
+    }
+  };
 
   const userColumns = [
     { key: 'risk', header: 'Risk', width: 80, render: (u: ManagedUser) => <span className={`badge ${riskBadge(u.risk_score)}`} style={{ minWidth: 50, justifyContent: 'center' }}>{(u.risk_score * 100).toFixed(0)}%</span> },
@@ -462,15 +554,19 @@ function PageUsers({ users, userAction }: { users: ManagedUser[]; userAction?: (
     { key: 'access_level', header: 'Access', width: 100, render: (u: ManagedUser) => (
       <select 
         value={u.access_level} 
-        onChange={(e) => userAction && userAction(u.id, 'update_access', e.target.value)}
+        onChange={(e) => {
+          e.target.blur(); // Remove focus after selecting to prevent UI glitch
+          handleUserAction(u.id, 'update_access', e.target.value);
+        }}
         onClick={(e) => e.stopPropagation()}
-        className={`badge ${u.access_level === 'Privileged' ? 'badge-warning' : u.access_level === 'None' ? 'badge-danger' : 'badge-neutral'}`}
+        className={`badge ${['Privileged', 'Admin'].includes(u.access_level) ? 'badge-warning' : u.access_level === 'None' ? 'badge-danger' : 'badge-neutral'}`}
         style={{ cursor: 'pointer', outline: 'none', appearance: 'none', border: 'none', WebkitAppearance: 'none' }}
       >
         <option value="Minimal">Minimal</option>
         <option value="Standard">Standard</option>
         <option value="Limited">Limited</option>
         <option value="Privileged">Privileged</option>
+        <option value="Admin">Admin</option>
         <option value="Restricted">Restricted</option>
         <option value="None">None</option>
       </select>
@@ -482,13 +578,13 @@ function PageUsers({ users, userAction }: { users: ManagedUser[]; userAction?: (
     { key: 'actions', header: 'Actions', width: 140, render: (u: ManagedUser) => (
       <div style={{ display: 'flex', gap: 4 }} onClick={(e) => e.stopPropagation()}>
         {u.status === 'locked' || u.status === 'revoked' ? (
-          <div style={{ padding: '0 4px', height: 24, display: 'flex' }}><Button variant="ghost" size="sm" onClick={() => userAction && userAction(u.id, 'unlock', 'Admin override')} title="Unlock Account"><Unlock size={12} color="#22c55e" /></Button></div>
+          <div style={{ padding: '0 4px', height: 24, display: 'flex' }}><Button variant="ghost" size="sm" onClick={() => handleUserAction(u.id, 'unlock', 'Admin override')} title="Unlock Account"><Unlock size={12} color="#22c55e" /></Button></div>
         ) : (
-          <div style={{ padding: '0 4px', height: 24, display: 'flex' }}><Button variant="ghost" size="sm" onClick={() => userAction && userAction(u.id, 'lock', 'Admin lock')} title="Lock Account"><Lock size={12} color="#f59e0b" /></Button></div>
+          <div style={{ padding: '0 4px', height: 24, display: 'flex' }}><Button variant="ghost" size="sm" onClick={() => handleUserAction(u.id, 'lock', 'Admin lock')} title="Lock Account"><Lock size={12} color="#f59e0b" /></Button></div>
         )}
-        <div style={{ padding: '0 4px', height: 24, display: 'flex' }}><Button variant="ghost" size="sm" onClick={() => userAction && userAction(u.id, 'revoke_access', 'Admin revoked')} title="Revoke All Access"><ShieldOff size={12} color="#ef4444" /></Button></div>
-        {!u.mfa && <div style={{ padding: '0 4px', height: 24, display: 'flex' }}><Button variant="ghost" size="sm" onClick={() => userAction && userAction(u.id, 'force_mfa', 'Enforce MFA')} title="Force MFA"><ShieldAlert size={12} color="#3b82f6" /></Button></div>}
-        <div style={{ padding: '0 4px', height: 24, display: 'flex' }}><Button variant="ghost" size="sm" onClick={() => userAction && userAction(u.id, 'reset_risk', 'Admin reset')} title="Reset Risk Indicators"><RefreshCw size={12} color="#8892a4" /></Button></div>
+        <div style={{ padding: '0 4px', height: 24, display: 'flex' }}><Button variant="ghost" size="sm" onClick={() => handleUserAction(u.id, 'revoke_access', 'Admin revoked')} title="Revoke All Access"><ShieldOff size={12} color="#ef4444" /></Button></div>
+        {!u.mfa && <div style={{ padding: '0 4px', height: 24, display: 'flex' }}><Button variant="ghost" size="sm" onClick={() => handleUserAction(u.id, 'force_mfa', 'Enforce MFA')} title="Force MFA"><ShieldAlert size={12} color="#3b82f6" /></Button></div>}
+        <div style={{ padding: '0 4px', height: 24, display: 'flex' }}><Button variant="ghost" size="sm" onClick={() => handleUserAction(u.id, 'reset_risk', 'Admin reset')} title="Reset Risk Indicators"><RefreshCw size={12} color="#8892a4" /></Button></div>
       </div>
     )}
   ];
@@ -635,10 +731,16 @@ function PageDevices({ endpoints }: { endpoints: Endpoint[] }) {
     { key: 'status', header: 'RBAC', width: 120, render: (ep: Endpoint) => <span className={`badge ${ep.status === 'LOCKED' ? 'badge-danger' : 'badge-success'}`}>{ep.status === 'LOCKED' ? <Lock size={10} /> : <Unlock size={10} />} {ep.status}</span> },
   ];
 
+  const sortedEndpoints = [...endpoints].sort((a, b) => {
+    const aUsage = a.status === 'OFFLINE' ? -1 : (a.cpu + a.ram);
+    const bUsage = b.status === 'OFFLINE' ? -1 : (b.cpu + b.ram);
+    return bUsage - aUsage;
+  });
+
   return (<div className="panel" style={{ flex: 1 }}>
     <div className="panel-header"><span className="panel-title"><Monitor size={14} /> Device Registry</span><span className="panel-subtitle">{endpoints.length} connected</span></div>
     <div className="panel-body">
-      <Table data={endpoints} columns={deviceColumns as any} emptyMessage="No devices connected" pageSize={15} />
+      <Table data={sortedEndpoints} columns={deviceColumns as any} emptyMessage="No devices connected" pageSize={15} />
     </div>
   </div>);
 }

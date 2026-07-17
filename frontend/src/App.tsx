@@ -3,12 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
   PieChart, Pie, Cell
 } from 'recharts';
-import {
-  LayoutDashboard, Shield, Users, Monitor, Clock, FileText, Activity,
-  AlertTriangle, ShieldCheck, ShieldAlert, Cpu, Network, Lock, Unlock,
-  ChevronUp, ChevronDown, Bell, TrendingUp, Eye, Search,
-  Trash2, X, ChevronRight, ToggleLeft, ToggleRight, Plus, Circle
-} from 'lucide-react';
+import { Shield, Activity, Users, Monitor, Lock, Unlock, AlertTriangle, ChevronUp, ChevronDown, Bell, Eye, Cpu, Network, FileText, ToggleLeft, ToggleRight, X, Clock, Plus, Search, TrendingUp, Trash2, ShieldOff, ShieldAlert, RefreshCw, LayoutDashboard, Circle, ChevronRight, ShieldCheck } from 'lucide-react';
 import './index.css';
 
 // Import components
@@ -194,7 +189,12 @@ function App() {
 
   const togglePolicy = async (pid: string, enabled: boolean) => {
     await gradioFetch('toggle_policy', [pid, enabled]);
-    // toast.info(`Policy ${enabled ? 'enabled' : 'disabled'}`);
+    gradioFetch('get_policies').then(d => { if (Array.isArray(d)) setPolicies(d); });
+    gradioFetch('get_events').then(d => { if (Array.isArray(d)) setEvents(d); });
+  };
+
+  const deletePolicy = async (pid: string) => {
+    await gradioFetch('delete_policy', [pid]);
     gradioFetch('get_policies').then(d => { if (Array.isArray(d)) setPolicies(d); });
     gradioFetch('get_events').then(d => { if (Array.isArray(d)) setEvents(d); });
   };
@@ -306,7 +306,7 @@ function App() {
           <ErrorBoundary name="PageContent">
             {page === 'dashboard' && <PageDashboard endpoints={endpoints} events={events} graphData={graphData} users={users} locked={locked} criticals={criticals} loginTrends={loginTrends} />}
             {page === 'users' && <PageUsers users={users} userAction={userAction} />}
-            {page === 'policies' && <PagePolicies policies={policies} togglePolicy={togglePolicy} />}
+            {page === 'policies' && <PagePolicies policies={policies} togglePolicy={togglePolicy} deletePolicy={deletePolicy} />}
             {page === 'devices' && <PageDevices endpoints={endpoints} />}
             {page === 'sessions' && <PageSessions sessions={sessions} killSession={killSession} />}
             {page === 'audit' && <PageAudit events={events} />}
@@ -479,6 +479,18 @@ function PageUsers({ users, userAction }: { users: ManagedUser[]; userAction?: (
     { key: 'mfa', header: 'MFA', width: 60, render: (u: ManagedUser) => u.mfa ? <span className="badge badge-success">On</span> : <span className="badge badge-danger">Off</span> },
     { key: 'files_accessed_today', header: 'Files', width: 60 },
     { key: 'logins', header: 'Logins', width: 80, render: (u: ManagedUser) => <span>{u.login_count_today} <span style={{ color: u.failed_logins_today >= 3 ? '#ef4444' : 'var(--text-muted)', fontSize: 11 }}>({u.failed_logins_today}F)</span></span> },
+    { key: 'actions', header: 'Actions', width: 140, render: (u: ManagedUser) => (
+      <div style={{ display: 'flex', gap: 4 }} onClick={(e) => e.stopPropagation()}>
+        {u.status === 'locked' || u.status === 'revoked' ? (
+          <div style={{ padding: '0 4px', height: 24, display: 'flex' }}><Button variant="ghost" size="sm" onClick={() => userAction && userAction(u.id, 'unlock', 'Admin override')} title="Unlock Account"><Unlock size={12} color="#22c55e" /></Button></div>
+        ) : (
+          <div style={{ padding: '0 4px', height: 24, display: 'flex' }}><Button variant="ghost" size="sm" onClick={() => userAction && userAction(u.id, 'lock', 'Admin lock')} title="Lock Account"><Lock size={12} color="#f59e0b" /></Button></div>
+        )}
+        <div style={{ padding: '0 4px', height: 24, display: 'flex' }}><Button variant="ghost" size="sm" onClick={() => userAction && userAction(u.id, 'revoke_access', 'Admin revoked')} title="Revoke All Access"><ShieldOff size={12} color="#ef4444" /></Button></div>
+        {!u.mfa && <div style={{ padding: '0 4px', height: 24, display: 'flex' }}><Button variant="ghost" size="sm" onClick={() => userAction && userAction(u.id, 'force_mfa', 'Enforce MFA')} title="Force MFA"><ShieldAlert size={12} color="#3b82f6" /></Button></div>}
+        <div style={{ padding: '0 4px', height: 24, display: 'flex' }}><Button variant="ghost" size="sm" onClick={() => userAction && userAction(u.id, 'reset_risk', 'Admin reset')} title="Reset Risk Indicators"><RefreshCw size={12} color="#8892a4" /></Button></div>
+      </div>
+    )}
   ];
 
   return (<div style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
@@ -539,7 +551,10 @@ function PageUsers({ users, userAction }: { users: ManagedUser[]; userAction?: (
 // ═══════════════════════════════════════════════════════════════════
 // POLICIES PAGE
 // ═══════════════════════════════════════════════════════════════════
-function PagePolicies({ policies, togglePolicy }: { policies: Policy[]; togglePolicy: (pid: string, enabled: boolean) => void }) {
+function PagePolicies({ policies, togglePolicy, deletePolicy }: { policies: Policy[]; togglePolicy: (pid: string, enabled: boolean) => void, deletePolicy?: (pid: string) => void }) {
+  const [showAdd, setShowAdd] = useState(false);
+  const [newPol, setNewPol] = useState({ name: '', category: 'General', scope: 'Global', enforcement: 'Alert' });
+
   const policyColumns = [
     { key: 'enabled', header: 'Enabled', width: 80, render: (p: Policy) => (
       <button onClick={() => togglePolicy(p.id, !p.enabled)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: p.enabled ? '#22c55e' : '#ef4444', padding: 2, display: 'flex' }} title={p.enabled ? 'Disable' : 'Enable'}>
@@ -551,6 +566,13 @@ function PagePolicies({ policies, togglePolicy }: { policies: Policy[]; togglePo
     { key: 'scope', header: 'Scope', width: 150 },
     { key: 'enforcement', header: 'Enforcement', width: 120, render: (p: Policy) => <span className="badge badge-info">{p.enforcement}</span> },
     { key: 'violations', header: 'Violations', width: 100, render: (p: Policy) => p.violations > 0 ? <span className="badge badge-danger" style={{ width: 24, textAlign: 'center', display: 'inline-block' }}>{p.violations}</span> : <span className="badge badge-neutral" style={{ width: 24, textAlign: 'center', display: 'inline-block' }}>0</span> },
+    { key: 'actions', header: '', width: 50, render: (p: Policy) => (
+      <div style={{ padding: '0 4px', height: 24, display: 'flex' }}>
+        <Button variant="ghost" size="sm" onClick={() => deletePolicy && deletePolicy(p.id)} title="Delete Policy" className="destructive">
+          <Trash2 size={12} />
+        </Button>
+      </div>
+    )},
   ];
 
   return (<div className="panel" style={{ flex: 1 }}>
@@ -558,16 +580,40 @@ function PagePolicies({ policies, togglePolicy }: { policies: Policy[]; togglePo
       <span className="panel-title"><Shield size={14} /> Security Policies</span>
       <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
         <span className="panel-subtitle">{policies.filter(p => p.enabled).length}/{policies.length} active</span>
-        <Button variant="primary" size="sm" onClick={() => {
-          const name = prompt('Enter new policy name:');
-          if (name) {
-            gradioFetch('add_policy', [name, 'General', 'Global', 'Alert']).then(d => {
-              if(d && d.policy) policies.push(d.policy);
-            });
-          }
-        }}><Plus size={14} /> Add Policy</Button>
+        <Button variant="primary" size="sm" onClick={() => setShowAdd(!showAdd)}><Plus size={14} /> Add Policy</Button>
       </div>
     </div>
+    
+    {showAdd && (
+      <div style={{ background: 'var(--bg-secondary)', padding: 16, borderBottom: '1px solid var(--border-color)', display: 'flex', gap: 12, alignItems: 'flex-end' }}>
+        <div style={{ flex: 2 }}>
+          <label style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Policy Name</label>
+          <input type="text" value={newPol.name} onChange={e => setNewPol({...newPol, name: e.target.value})} style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: 4, padding: '6px 8px', color: 'var(--text-primary)', fontSize: 12, outline: 'none' }} placeholder="e.g. Block USB Storage" />
+        </div>
+        <div style={{ flex: 1 }}>
+          <label style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Category</label>
+          <select value={newPol.category} onChange={e => setNewPol({...newPol, category: e.target.value})} style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: 4, padding: '6px 8px', color: 'var(--text-primary)', fontSize: 12, outline: 'none' }}>
+            <option>Data Protection</option><option>Authentication</option><option>Behavior</option><option>Cryptography</option><option>General</option>
+          </select>
+        </div>
+        <div style={{ flex: 1 }}>
+          <label style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Enforcement</label>
+          <select value={newPol.enforcement} onChange={e => setNewPol({...newPol, enforcement: e.target.value})} style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: 4, padding: '6px 8px', color: 'var(--text-primary)', fontSize: 12, outline: 'none' }}>
+            <option>Block</option><option>Alert</option><option>Quarantine</option><option>MFA Step-up</option>
+          </select>
+        </div>
+        <Button variant="primary" size="sm" onClick={() => {
+          if (newPol.name) {
+            gradioFetch('add_policy', [newPol.name, newPol.category, newPol.scope, newPol.enforcement]).then(d => {
+              if (d && d.policy) policies.push(d.policy);
+              setShowAdd(false);
+              setNewPol({ name: '', category: 'General', scope: 'Global', enforcement: 'Alert' });
+            });
+          }
+        }}>Save Policy</Button>
+      </div>
+    )}
+
     <div className="panel-body">
       <Table data={policies} columns={policyColumns as any} emptyMessage="No policies configured" pageSize={20} />
     </div>

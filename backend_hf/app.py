@@ -7,6 +7,7 @@ from src.api_server import (
 )
 from src.api_server import user_action as _user_action
 from src.api_server import toggle_policy as _toggle_policy
+from src.api_server import delete_policy as _delete_policy
 from src.api_server import ingest_cert_log as _ingest_cert_log
 from src.api_server import UserAction, PolicyToggle, CertEvent
 
@@ -18,6 +19,9 @@ def user_action_adapter(user_id, action, reason):
 
 def toggle_policy_adapter(policy_id, enabled):
     return _toggle_policy(policy_id, PolicyToggle(enabled=enabled))
+
+def delete_policy_adapter(policy_id):
+    return _delete_policy(policy_id)
 
 def get_events_adapter():
     return get_events(limit=50)
@@ -57,6 +61,7 @@ with gr.Blocks() as demo:
     pid_input = gr.Textbox(visible=False)
     enabled_input = gr.Checkbox(visible=False)
     gr.Button("toggle_policy").click(toggle_policy_adapter, inputs=[pid_input, enabled_input], outputs=[dummy_out], api_name="toggle_policy")
+    gr.Button("delete_policy").click(delete_policy_adapter, inputs=[pid_input], outputs=[dummy_out], api_name="delete_policy")
     
     agent_id_input = gr.Textbox(visible=False)
     gr.Button("kill_session").click(kill_session, inputs=[agent_id_input], outputs=[dummy_out], api_name="kill_session")

@@ -598,6 +598,15 @@ def toggle_policy(policy_id: str, body: PolicyToggle):
             action = "enabled" if body.enabled else "disabled"
             _add_event("SYSTEM", f"Policy {action}: {pol['name']}", "WARNING", "policy")
             return {"status": "ok", "policy": pol}
+
+@app.post("/api/v1/policies/{policy_id}/delete")
+def delete_policy(policy_id: str):
+    global security_policies
+    initial_len = len(security_policies)
+    security_policies = [p for p in security_policies if p["id"] != policy_id]
+    if len(security_policies) < initial_len:
+        _add_event("SYSTEM", f"Policy deleted: {policy_id}", "INFO", "policy")
+        return {"status": "ok"}
     raise HTTPException(status_code=404, detail="Policy not found")
 
 
@@ -826,10 +835,10 @@ def autonomous_telemetry_simulator():
     
     iteration = 0
     while True:
-        time.sleep(1.0) # Tick every 1.0 second (one by one clearly)
+        time.sleep(0.2) # FAST Tick every 0.2 second (real-time active feel)
         iteration += 1
         
-        # Very slow decay (every 120 ticks ~ 2 min) to prevent infinite growth but allow stats to accumulate
+        # Very slow decay (every 120 ticks) to prevent infinite growth but allow stats to accumulate
         if iteration % 120 == 0:
             for u in managed_users.values():
                 u["files_accessed_today"] = max(int(u.get("files_accessed_today", 0) * 0.95), 0)
@@ -898,7 +907,7 @@ def autonomous_telemetry_simulator():
             num_endpoints = len(active_endpoints)
             if after_hours:
                 # After hours: randomly log off users to scale down
-                if num_endpoints > 50 and random.random() < 0.2:
+                if num_endpoints > 20 and random.random() < 0.1:
                     uid_to_remove = random.choice(list(active_endpoints.keys()))
                     active_endpoints[uid_to_remove]["status"] = "OFFLINE"
             else:
@@ -908,6 +917,32 @@ def autonomous_telemetry_simulator():
                     if f"ep-{random_uid}" not in active_endpoints:
                         # Log them in organically
                         ingest_cert_log(CertEvent(user_id=random_uid, event_type="logon", action="Logon", details="Workstation"))
+            
+            # --- ORGANIC NEW USER ONBOARDING ---
+            if iteration % 200 == 0 and random.random() < 0.5:
+                # Simulate a new hire or guest account being created
+                new_uid = f"U{random.randint(9000, 9999)}"
+                if new_uid not in managed_users:
+                    managed_users[new_uid] = {
+                        "id": new_uid,
+                        "name": f"New Hire {new_uid}",
+                        "role": random.choice(["Engineer", "Analyst", "Contractor"]),
+                        "department": random.choice(["Engineering", "Sales", "HR"]),
+                        "access_level": random.choice(["Minimal", "Standard"]),
+                        "status": "active",
+                        "mfa": True,
+                        "files_accessed_today": 0,
+                        "login_count_today": 1,
+                        "failed_logins_today": 0,
+                        "usb_attempts": 0,
+                        "after_hours_activity": False,
+                        "behavioral_baseline": {"avg_files": random.randint(5, 20), "avg_logins": random.randint(1, 3)},
+                        "last_login": time.time(),
+                        "risk_score": 0.05
+                    }
+                    _add_event("SYSTEM", f"New user provisioned: {new_uid}", "INFO", "Identity")
+                    # Bring them online
+                    ingest_cert_log(CertEvent(user_id=new_uid, event_type="logon", action="Logon", details="Workstation"))
 
             # --- TIMED MALICIOUS INJECTION ---
             trigger_malicious = False
@@ -967,14 +1002,16 @@ def autonomous_telemetry_simulator():
         for ep_id, ep in active_endpoints.items():
             if ep["status"] != "LOCKED":
                 # Randomly fluctuate endpoints online/offline
-                if random.random() < 0.02:
+                if random.random() < 0.005: # reduced offline chance due to faster ticks
                     ep["status"] = "OFFLINE"
-                elif random.random() < 0.05 and ep["status"] == "OFFLINE":
+                elif random.random() < 0.02 and ep["status"] == "OFFLINE":
                     ep["status"] = "SECURE"
                     
                 if ep["status"] != "OFFLINE":
-                    ep["cpu"] = max(5, min(95, ep["cpu"] + random.randint(-10, 10)))
-                    ep["ram"] = max(20, min(90, ep["ram"] + random.randint(-5, 5)))
+                    # Aggressive fluctuation for real-time feel
+                    ep["cpu"] = max(5, min(95, ep["cpu"] + random.randint(-25, 25)))
+                    ep["ram"] = max(20, min(90, ep["ram"] + random.randint(-15, 15)))
+                    ep["net_conns"] = max(2, min(500, ep["net_conns"] + random.randint(-10, 20)))
                 ep["last_seen"] = time.time()
                 
                 # Link AI Behavioral Risk to Device Risk directly!

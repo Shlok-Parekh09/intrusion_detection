@@ -909,7 +909,6 @@ def autonomous_telemetry_simulator():
                 # -----------------
                 # INSIDER THREAT (every 120 seconds)
                 # -----------------
-                global last_malicious_time
                 if 'last_malicious_time' not in globals():
                     globals()['last_malicious_time'] = time.time()
                     

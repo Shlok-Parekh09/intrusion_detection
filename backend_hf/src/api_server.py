@@ -410,7 +410,7 @@ def get_dashboard_state():
     """Aggregated endpoint to prevent 429 Rate Limits by serving everything in 1 request."""
     # 1. Endpoints
     now = time.time()
-    active_eps = [ep for ep in get_safe_values(active_endpoints) if now - ep["last_seen"] < 30]
+    active_eps = [ep for ep in get_safe_values(active_endpoints) if ep.get("status") != "OFFLINE"]
     
     # 2. Events
     filtered_events = sorted(live_events, key=lambda x: x["time"], reverse=True)[:50]

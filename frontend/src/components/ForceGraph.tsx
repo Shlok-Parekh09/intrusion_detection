@@ -46,6 +46,9 @@ const NODE_COLORS = {
   threat: { fill: '#ef4444', stroke: '#f87171', gradient: ['rgba(239, 68, 68, 0.9)', 'rgba(239, 68, 68, 0.15)'] },
 };
 
+// Store camera state globally so it persists when switching tabs!
+const savedCamera = { x: 0, y: 0, k: 1, hasFitted: false };
+
 export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGraphEnhancedProps) {
   const fgRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -53,7 +56,6 @@ export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGra
   const [pinnedNode, setPinnedNode] = useState<GraphNode | null>(null);
   const [zoom, setZoom] = useState(1.0);
   const [width, setWidth] = useState(800);
-
 
   useEffect(() => {
     if (containerRef.current) setWidth(containerRef.current.offsetWidth);
@@ -64,16 +66,20 @@ export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGra
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const hasFit = useRef(false);
-
-  // Auto-center ONCE when nodes first appear - never again (prevents zoom loop)
+  // Restore camera or auto-center ONCE when nodes first appear
   useEffect(() => {
-    if (data.nodes.length > 0 && fgRef.current && !hasFit.current) {
-      hasFit.current = true;
-      // Delay so D3 warmup ticks finish before we fit
-      setTimeout(() => {
-        fgRef.current?.zoomToFit(600, 80);
-      }, 1200);
+    if (data.nodes.length > 0 && fgRef.current) {
+      if (!savedCamera.hasFitted) {
+        savedCamera.hasFitted = true;
+        // Delay so D3 warmup ticks finish before we fit
+        setTimeout(() => {
+          fgRef.current?.zoomToFit(600, 80);
+        }, 1200);
+      } else {
+        // Restore saved camera position
+        fgRef.current?.centerAt(savedCamera.x, savedCamera.y, 0);
+        fgRef.current?.zoom(savedCamera.k, 0);
+      }
     }
   }, [data.nodes.length]);
 

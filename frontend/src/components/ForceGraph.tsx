@@ -125,24 +125,28 @@ export function ForceGraphEnhanced({ data, height = 400, onNodeClick }: ForceGra
     const label = (node.label || node.id || '').substring(0, 12);
 
     // Draw Node shape (Circle)
+    // Scale nodes slightly when zoomed out so they don't disappear
+    const drawRadius = radius + (1 / globalScale); 
+    
     ctx.beginPath();
-    ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI, false);
+    ctx.arc(node.x, node.y, drawRadius, 0, 2 * Math.PI, false);
     ctx.fillStyle = node.is_red ? '#ef4444' : (node.type === 'file' ? '#f59e0b' : '#3b82f6');
     ctx.fill();
     
     // Node outline
-    ctx.lineWidth = 1.5 / globalScale; // Thinner lines when zoomed out
+    ctx.lineWidth = 1.5 / globalScale; 
     ctx.strokeStyle = '#0f172a';
     ctx.stroke();
 
-    // Only draw text if we are reasonably zoomed in, OR if it's a critical threat
-    // This saves MASSIVE amounts of CPU and completely eliminates canvas rendering lag
-    if (globalScale > 0.8 || node.is_red) {
-      ctx.font = `${6}px Inter`;
+    // Dynamically scale font size so it's ALWAYS legible on screen
+    const fontSize = Math.max(3, 8 / globalScale);
+    
+    if (fontSize > 1) { // Only skip text if it's ridiculously zoomed out
+      ctx.font = `${node.is_red ? 'bold ' : ''}${fontSize}px Inter`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
-      ctx.fillStyle = '#f8fafc';
-      ctx.fillText(label, node.x, node.y + radius + 3);
+      ctx.fillStyle = node.is_red ? '#ef4444' : '#f8fafc';
+      ctx.fillText(label, node.x, node.y + drawRadius + (2 / globalScale));
     }
 
     // Highlight pinned node

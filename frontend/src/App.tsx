@@ -9,63 +9,25 @@ import './index.css';
 // Import components
 import { StatCard, Button, Table, Skeleton, Breadcrumbs, ErrorBoundary, NotificationBell, UserMenu, useCommandPalette, ForceGraphEnhanced } from './components';
 import { useToast, ToastContainer } from './components/Toast';
-const getBackendUrl = () => {
-  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-  return import.meta.env.VITE_BACKEND_URL || (isLocal ? "http://127.0.0.1:7860/" : "https://shlok0829-vortex-siem-backend.hf.space/");
+import { Client } from "@gradio/client";
+
+let gradioClient: any = null;
+const getClient = async () => {
+  if (!gradioClient) {
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const backendUrl = import.meta.env.VITE_BACKEND_URL || (isLocal ? "http://127.0.0.1:7860/" : "https://shlok0829-vortex-siem-backend.hf.space/");
+    gradioClient = await Client.connect(backendUrl);
+  }
+  return gradioClient;
 };
 
 const gradioFetch = async (endpoint: string, args: any[] = []) => {
   try {
-    const baseUrl = getBackendUrl().replace(/\/$/, "");
-    let url = "";
-    let method = "GET";
-    let body = undefined;
-
-    switch (endpoint) {
-      case 'get_dashboard_state': url = "/api/v1/dashboard-state"; break;
-      case 'get_users': url = "/api/v1/users"; break;
-      case 'get_events': url = "/api/v1/events"; break;
-      case 'get_policies': url = "/api/v1/policies"; break;
-      case 'get_sessions': url = "/api/v1/sessions"; break;
-      case 'user_behavior': url = `/api/v1/analytics/behavior/${args[0]}`; break;
-      case 'user_action':
-        url = `/api/v1/users/${args[0]}/action`;
-        method = "POST";
-        body = JSON.stringify({ action: args[1], reason: args[2] });
-        break;
-      case 'add_policy':
-        url = "/api/v1/policies";
-        method = "POST";
-        body = JSON.stringify({ name: args[0], category: args[1], scope: args[2], enforcement: args[3] });
-        break;
-      case 'toggle_policy':
-        url = `/api/v1/policies/${args[0]}/toggle`;
-        method = "POST";
-        body = JSON.stringify({ enabled: args[1] });
-        break;
-      case 'delete_policy':
-        url = `/api/v1/policies/${args[0]}/delete`;
-        method = "POST";
-        break;
-      case 'kill_session':
-        url = `/api/v1/sessions/${args[0]}/kill`;
-        method = "POST";
-        break;
-      default:
-        console.error(`Unknown endpoint: ${endpoint}`);
-        return null;
-    }
-
-    const res = await fetch(`${baseUrl}${url}`, {
-      method,
-      headers: body ? { 'Content-Type': 'application/json' } : undefined,
-      body
-    });
-    
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
+    const client = await getClient();
+    const result = await client.predict(`/${endpoint}`, args);
+    return result.data ? result.data[0] : null;
   } catch (err) {
-    console.error(`Fetch failed for ${endpoint}:`, err);
+    console.error(`Gradio fetch failed for ${endpoint}:`, err);
     return null;
   }
 };

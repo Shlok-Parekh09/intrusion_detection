@@ -9,7 +9,6 @@ import './index.css';
 // Import components
 import { StatCard, Button, Table, Skeleton, Breadcrumbs, ErrorBoundary, NotificationBell, UserMenu, useCommandPalette, ForceGraphEnhanced } from './components';
 import { useToast, ToastContainer } from './components/Toast';
-
 const getBackendUrl = () => {
   const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   return import.meta.env.VITE_BACKEND_URL || (isLocal ? "http://127.0.0.1:7860/" : "https://shlok0829-vortex-siem-backend.hf.space/");

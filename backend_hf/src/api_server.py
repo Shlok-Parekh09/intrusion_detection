@@ -12,6 +12,9 @@ import threading
 from typing import Optional
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
+# Set a fixed random seed so that Hugging Face and Localhost generate EXACTLY the same data
+random.seed(42)
+
 app = FastAPI(title="Quantum-Secure Enterprise SIEM")
 
 app.add_middleware(

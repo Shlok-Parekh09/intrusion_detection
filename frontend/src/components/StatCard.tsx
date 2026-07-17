@@ -58,9 +58,7 @@ export function StatCard({ icon, iconClass, label, value, sub, subClass, trend, 
 
   const formatValue = (val: number) => {
     if (typeof value === 'string') return value;
-    if (val >= 1000000) return (val / 1000000).toFixed(1) + 'M';
-    if (val >= 1000) return (val / 1000).toFixed(1) + 'K';
-    return Math.round(val);
+    return Math.round(val).toLocaleString();
   };
 
   return (

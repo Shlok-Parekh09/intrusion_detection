@@ -404,11 +404,20 @@ function App() {
 // ═══════════════════════════════════════════════════════════════════
 function PageDashboard({ endpoints, events, graphData, users, locked, criticals, loginTrends }: any) {
   const trends = loginTrends && loginTrends.length > 0 ? loginTrends : [];
+  
+  // Strictly filter users to only those with currently active (non-OFFLINE) endpoints
+  const activeEndpointUserIds = new Set(
+    endpoints
+      .filter((e: any) => e.status !== 'OFFLINE')
+      .map((e: any) => e.agent_id?.replace('ep-', ''))
+  );
+  const activeUsers = users.filter((u: any) => activeEndpointUserIds.has(u.id));
+
   const riskDist = [
-    { name: 'Low', value: users.filter((u: any) => u.risk_score < 0.3).length, color: '#22c55e' },
-    { name: 'Medium', value: users.filter((u: any) => u.risk_score >= 0.3 && u.risk_score < 0.5).length, color: '#3b82f6' },
-    { name: 'High', value: users.filter((u: any) => u.risk_score >= 0.5 && u.risk_score < 0.8).length, color: '#f59e0b' },
-    { name: 'Critical', value: users.filter((u: any) => u.risk_score >= 0.8).length, color: '#ef4444' },
+    { name: 'Low', value: activeUsers.filter((u: any) => u.risk_score < 0.3).length, color: '#22c55e' },
+    { name: 'Medium', value: activeUsers.filter((u: any) => u.risk_score >= 0.3 && u.risk_score < 0.5).length, color: '#3b82f6' },
+    { name: 'High', value: activeUsers.filter((u: any) => u.risk_score >= 0.5 && u.risk_score < 0.8).length, color: '#f59e0b' },
+    { name: 'Critical', value: activeUsers.filter((u: any) => u.risk_score >= 0.8).length, color: '#ef4444' },
   ];
 
   return (<>
@@ -416,7 +425,7 @@ function PageDashboard({ endpoints, events, graphData, users, locked, criticals,
     <div className="stats-row">
       <StatCard icon={<Monitor size={18} />} iconClass="blue" label="Active Endpoints" value={endpoints.filter((e: any) => e.status !== 'OFFLINE').length} sub={<><Cpu size={11} /> QPC Encrypted</>} />
       <StatCard icon={<AlertTriangle size={18} />} iconClass="red" label="Active Threats" value={locked} sub={locked > 0 ? <><ChevronUp size={11} /> RBAC Lockout</> : <><ChevronDown size={11} /> Clear</>} subClass={locked > 0 ? 'up' : 'down'} />
-      <StatCard icon={<Users size={18} />} iconClass="yellow" label="High-Risk Users" value={users.filter((u: any) => u.risk_score >= 0.5).length} sub={<><Eye size={11} /> Behavioral AI</>} />
+      <StatCard icon={<Users size={18} />} iconClass="yellow" label="High-Risk Users" value={activeUsers.filter((u: any) => u.risk_score >= 0.5).length} sub={<><Eye size={11} /> Behavioral AI</>} />
       <StatCard icon={<Bell size={18} />} iconClass="red" label="Critical Alerts" value={criticals} sub={criticals > 0 ? <><ChevronUp size={11} /> Needs attention</> : <>All clear</>} subClass={criticals > 0 ? 'up' : 'neutral'} />
     </div>
 

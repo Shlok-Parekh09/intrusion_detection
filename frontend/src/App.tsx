@@ -11,14 +11,14 @@ import { StatCard, Button, Table, Skeleton, Breadcrumbs, ErrorBoundary, Notifica
 import { useToast, ToastContainer } from './components/Toast';
 import { Client } from "@gradio/client";
 
-let gradioClient: any = null;
+let clientPromise: Promise<any> | null = null;
 const getClient = async () => {
-  if (!gradioClient) {
+  if (!clientPromise) {
     const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     const backendUrl = import.meta.env.VITE_BACKEND_URL || (isLocal ? "http://127.0.0.1:7860/" : "https://shlok0829-vortex-siem-backend.hf.space/");
-    gradioClient = await Client.connect(backendUrl);
+    clientPromise = Client.connect(backendUrl);
   }
-  return gradioClient;
+  return clientPromise;
 };
 
 const gradioFetch = async (endpoint: string, args: any[] = []) => {
